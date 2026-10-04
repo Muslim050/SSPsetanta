@@ -5,7 +5,11 @@ export default function Reports() {
   return (
     <div>
       <PageHeader />
-      <TotalStatisticsReport />
+      {/* Рекламодателю — без эфирных карточек и со своим заголовком. */}
+      <TotalStatisticsReport
+        title="Общая статистика Setanta Sports"
+        showMetrics={false}
+      />
     </div>
   )
 }

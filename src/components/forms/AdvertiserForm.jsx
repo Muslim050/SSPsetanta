@@ -6,8 +6,11 @@ import {
   useSaveAdvertiser,
 } from '@/features/advertisers/queries'
 import { contractFileInput } from '@/features/contracts/files'
+import { useDeleteContract } from '@/features/contracts/queries'
+import { reportContractDeleteError } from '@/features/contracts/deleteError'
 import { fileHref } from '@/features/files/download'
 import { useToast } from '@/components/ui/Toast.jsx'
+import { useConfirm } from '@/components/ui/Confirm.jsx'
 import { Modal } from '@/components/ui/Modal.jsx'
 import { Button } from '@/components/ui/Button'
 import { Field, Input, Select, Textarea } from '@/components/ui/Field'
@@ -154,7 +157,10 @@ const formFrom = (advertiser) => ({
 
 export function AdvertiserForm({ open, onClose, initial }) {
   const { mutate: saveAdvertiser, isPending } = useSaveAdvertiser()
+  const { mutate: deleteContract, isPending: deletingContract } =
+    useDeleteContract()
   const toast = useToast()
+  const confirm = useConfirm()
   const editing = !!initial
   const [form, setForm] = useState(emptyForm)
   const [errors, setErrors] = useState({})
@@ -240,11 +246,56 @@ export function AdvertiserForm({ open, onClose, initial }) {
       ),
     }))
 
-  const removeContract = (id) =>
-    setForm((f) => ({
-      ...f,
-      contracts: f.contracts.filter((contract) => contract.id !== id),
-    }))
+  /**
+   * Новый договор просто убираем из формы. Сохранённый удаляем на сервере
+   * сразу, с подтверждением: ждать «Сохранить» здесь неочевидно, и к тому же
+   * сохранение упирается в проверку полей бренда на другой вкладке.
+   */
+  const removeContract = async (contract) => {
+    const dropFromForm = () =>
+      setForm((f) => ({
+        ...f,
+        contracts: f.contracts.filter((item) => item.id !== contract.id),
+      }))
+    if (typeof contract.id !== 'number') {
+      dropFromForm()
+      return
+    }
+
+    const ok = await confirm({
+      title: 'Удалить договор?',
+      description: contract.number,
+      body: 'Кампании, оформленные по нему, останутся — у них сохранится номер договора.',
+    })
+    if (!ok) return
+
+    deleteContract(
+      { advertiserId: source?.id ?? createdId, id: contract.id },
+      {
+        onSuccess: () => {
+          dropFromForm()
+          // Договора на сервере больше нет — убираем его и из опоры для
+          // сравнения, иначе «Сохранить» попробовал бы удалить его ещё раз.
+          setSource(
+            (current) =>
+              current && {
+                ...current,
+                contracts: (current.contracts ?? []).filter(
+                  (item) => item.id !== contract.id,
+                ),
+              },
+          )
+          toast.info('Договор удалён')
+        },
+        onError: (err) =>
+          reportContractDeleteError(err, {
+            confirm,
+            toast,
+            number: contract.number,
+          }),
+      },
+    )
+  }
 
   const submit = () => {
     const err = {}
@@ -252,7 +303,13 @@ export function AdvertiserForm({ open, onClose, initial }) {
     if (!form.email.trim() || !form.email.includes('@'))
       err.email = 'Некорректный email'
     setErrors(err)
-    if (Object.keys(err).length) return
+    if (Object.keys(err).length) {
+      // Поля бренда — на вкладке «Реквизиты»: с вкладки договоров ошибку
+      // иначе не видно, и кажется, что «Сохранить» не сработал.
+      setTab('main')
+      toast.error('Заполните обязательные поля бренда')
+      return
+    }
 
     const advertiser = {
       name: form.name.trim(),
@@ -403,7 +460,7 @@ export function AdvertiserForm({ open, onClose, initial }) {
           <Input
             value={form.name}
             onChange={(e) => set('name', e.target.value)}
-            placeholder="Например, Artel"
+            placeholder="Как бренд будет подписан в кабинете"
           />
         </Field>
 
@@ -459,8 +516,10 @@ export function AdvertiserForm({ open, onClose, initial }) {
             value={form.requisites}
             onChange={(e) => set('requisites', e.target.value)}
             className="min-h-[164px]"
+            // Формат вместо примера: настоящие реквизиты в подсказке
+            // легко принять за уже заполненные.
             placeholder={
-              'ИНН: 311985311\nБанк: ГО АК «Алокабанк», г. Ташкент\nМФО: 00401\nР/с: 20208000407214976001\nАдрес: г. Ташкент, ул. Elbek, 8'
+              'ИНН: 9 цифр\nБанк: название банка, город\nМФО: 5 цифр\nР/с: 20 цифр\nАдрес: город, улица, дом'
             }
           />
         </Field>
@@ -541,9 +600,10 @@ export function AdvertiserForm({ open, onClose, initial }) {
               </p>
               <Button
                 size="sm"
-                variant="secondary"
+                variant="danger"
                 className="h-8 w-8 px-0"
-                onClick={() => removeContract(contract.id)}
+                onClick={() => removeContract(contract)}
+                disabled={deletingContract}
                 title="Удалить договор"
                 aria-label={`Удалить договор ${index + 1}`}
               >

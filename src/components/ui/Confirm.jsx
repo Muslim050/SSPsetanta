@@ -15,8 +15,9 @@ export function ConfirmProvider({ children }) {
         resolver.current = resolve
         setState({
           title: 'Подтвердите действие',
-          confirmText: 'Удалить',
-          tone: 'danger',
+          // `alert` — окно-уведомление с одной кнопкой: подтверждать нечего.
+          confirmText: opts?.alert ? 'Понятно' : 'Удалить',
+          tone: opts?.alert ? 'primary' : 'danger',
           ...opts,
         })
       }),
@@ -41,9 +42,11 @@ export function ConfirmProvider({ children }) {
         size="sm"
         footer={
           <>
-            <Button variant="ghost" onClick={() => close(false)}>
-              Отмена
-            </Button>
+            {!state?.alert && (
+              <Button variant="ghost" onClick={() => close(false)}>
+                Отмена
+              </Button>
+            )}
             <Button
               variant={state?.tone === 'danger' ? 'danger' : 'primary'}
               onClick={() => close(true)}

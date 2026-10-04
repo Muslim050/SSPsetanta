@@ -577,62 +577,68 @@ export default function Campaigns() {
 
   return (
     <FadeIn>
-      {/* Поиск, фильтр статусов и создание кампании — одной строкой */}
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        {/* Поиск всегда на виду: поле открыто, крестик очищает запрос. */}
-        <div className="relative w-full shrink-0 sm:w-[210px]">
-          <Search
-            size={16}
-            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted"
-          />
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            onKeyDown={(e) => e.key === 'Escape' && setQ('')}
-            aria-label="Поиск кампании"
-            placeholder="Поиск по названию…"
-            className={cn(
-              'h-11 w-full rounded-xl border border-line bg-surface pl-9 pr-9 text-sm text-ink transition-colors placeholder:text-ink-muted hover:border-indigo-300 focus-ring focus-visible:border-indigo-300',
-              query && 'border-indigo-300',
+      {/* Шапка: поиск и статусы — одной строкой, под статусами — создание
+          кампании. */}
+      <div className="mb-5 space-y-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          {/* Поиск всегда на виду: поле открыто, крестик очищает запрос. */}
+          <div className="relative w-full shrink-0 sm:w-[240px]">
+            <Search
+              size={16}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted"
+            />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onKeyDown={(e) => e.key === 'Escape' && setQ('')}
+              aria-label="Поиск кампании"
+              placeholder="Поиск по названию…"
+              className={cn(
+                'h-11 w-full rounded-xl border border-line bg-surface pl-9 pr-9 text-sm text-ink transition-colors placeholder:text-ink-muted hover:border-indigo-300 focus-ring focus-visible:border-indigo-300',
+                query && 'border-indigo-300',
+              )}
+            />
+            {q && (
+              <button
+                type="button"
+                onClick={() => setQ('')}
+                aria-label="Очистить поиск"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1 text-ink-muted transition-colors hover:bg-ink/6 hover:text-ink focus-ring"
+              >
+                <X size={14} />
+              </button>
             )}
-          />
-          {q && (
-            <button
-              type="button"
-              onClick={() => setQ('')}
-              aria-label="Очистить поиск"
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1 text-ink-muted transition-colors hover:bg-ink/6 hover:text-ink focus-ring"
-            >
-              <X size={14} />
-            </button>
-          )}
-          {/* Сколько кампаний осталось после поиска — подписью под полем. */}
-          {query && (
-            <p className="absolute left-1 top-full mt-1 text-[12px] text-ink-muted">
-              Найдено: {filtered.length}
-            </p>
-          )}
+            {/* Сколько кампаний осталось после поиска — подписью под полем. */}
+            {query && (
+              <p className="absolute left-1 top-full mt-1 text-[12px] text-ink-muted">
+                Найдено: {filtered.length}
+              </p>
+            )}
+          </div>
+          {/* min-w-0 — иначе ряд статусов разрастается и уезжает за край;
+              так он прокручивается вбок, оставаясь в строке с поиском. */}
+          <div className="flex min-w-0 sm:justify-end">
+            <SegmentTabs
+              value={activeStatus}
+              onChange={setStatus}
+              items={statusItems}
+            />
+          </div>
         </div>
-        {/* min-w-0 — иначе флекс-элемент разрастается под ширину вкладок
-            и ряд статусов уезжает за пределы страницы. */}
-        <div className="flex min-w-0 flex-wrap items-center gap-3 sm:justify-end">
-          <SegmentTabs
-            value={activeStatus}
-            onChange={setStatus}
-            items={statusItems}
-          />
-          {isAdvertiser && (
+
+        {/* Заявку заводит рекламодатель — за свой бренд — или площадка за
+            выбранный; наблюдателю кнопки нет. */}
+        {canEdit && (
+          <div className="flex justify-end">
             <Button
               variant="primary"
-              // Высота под сегментные табы: их 42px против дефолтных 44px кнопки.
-              className="h-[42px] shrink-0"
               onClick={() => setModal({ open: true, initial: null })}
             >
               <Plus size={18} />
-              Новая кампания
+              Создать кампанию
             </Button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Вкладки брендов */}
@@ -861,12 +867,12 @@ export default function Campaigns() {
               icon={Megaphone}
               title="Кампаний нет"
               description={
-                isAdvertiser
+                canEdit
                   ? 'Измените фильтры или создайте новую кампанию.'
                   : 'По выбранным фильтрам кампаний нет.'
               }
               action={
-                isAdvertiser ? (
+                canEdit ? (
                   <Button
                     variant="secondary"
                     onClick={() => setModal({ open: true, initial: null })}
@@ -1174,6 +1180,8 @@ export default function Campaigns() {
       <CampaignForm
         open={modal.open}
         initial={modal.initial}
+        // Площадке на вкладке бренда подставляем его сразу.
+        defaultAdvertiserId={activeBrand === ALL_BRANDS ? null : activeBrand}
         onClose={() => setModal({ open: false, initial: null })}
       />
 

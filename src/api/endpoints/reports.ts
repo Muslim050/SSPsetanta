@@ -1,6 +1,7 @@
 import { request, requestFile } from '../client'
 import { buildQuery } from '../query'
 import type {
+  ManualReportInput,
   Paginated,
   Report,
   ReportImport,
@@ -13,7 +14,7 @@ import type {
 
 /**
  * Отчёт за месяц по договору. Площадка раз в месяц загружает файл
- * статистики, сервер разбирает его на семь листов и хранит по месяцам.
+ * статистики, сервер разбирает его на девять листов и хранит по месяцам.
  *
  * Читают и выгружают все роли; загружать и править может только площадка —
  * остальным сервер отвечает 403, а транспорт на 403 разлогинивает. Поэтому
@@ -27,7 +28,7 @@ export function months(contractId: number): Promise<ReportMonth[]> {
   return request<ReportMonth[]>(base(contractId))
 }
 
-/** GET /contracts/:id/reports/:period — семь листов. Нет файла за месяц — 404. */
+/** GET /contracts/:id/reports/:period — девять листов. Нет файла за месяц — 404. */
 export function get(contractId: number, period: ReportPeriod): Promise<Report> {
   return request<Report>(`${base(contractId)}/${period}`)
 }
@@ -47,6 +48,34 @@ export function importFile(
   return request<Report>(`${base(contractId)}/${period}/import`, {
     method: 'POST',
     body: form,
+  })
+}
+
+/**
+ * GET /contracts/:id/reports/:period/manual — ручной отчёт за месяц (цифры
+ * вкладки Spot): `spots` по каналам, промо и прероллы, `sheets` пустой.
+ * Ручного отчёта за месяц нет — 404.
+ */
+export function getManual(
+  contractId: number,
+  period: ReportPeriod,
+): Promise<Report> {
+  return request<Report>(`${base(contractId)}/${period}/manual`)
+}
+
+/**
+ * POST /contracts/:id/reports/:period/manual — ручной отчёт за месяц: цифры
+ * по каналам, промо и прероллы. Заводит его или заменяет прежний ручной.
+ * Файловый отчёт того же месяца не меняется — это отдельный отчёт.
+ */
+export function saveManual(
+  contractId: number,
+  period: ReportPeriod,
+  input: ManualReportInput,
+): Promise<Report> {
+  return request<Report>(`${base(contractId)}/${period}/manual`, {
+    method: 'POST',
+    body: input,
   })
 }
 
