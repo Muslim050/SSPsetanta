@@ -35,6 +35,8 @@ const emptyForm = {
   // у ролика договора его нет, такой уходит ссылкой.
   creative: null,
   contractNumber: '',
+  // Бренд заявки — выбирает только площадка на создании.
+  advertiserId: null,
 }
 
 /** Имя файла из ссылки — подпись ролику, если своей нет. */
@@ -96,7 +98,13 @@ const formFrom = (campaign) => ({
   contractNumber: campaign.contractNumber || '',
 })
 
-export function CampaignForm({ open, onClose, initial }) {
+/**
+ * Создание и правка заявки. Заводит заявку рекламодатель — за свой бренд —
+ * или площадка за выбранный бренд: тогда сервер ставит статус «Получен».
+ * `defaultAdvertiserId` — бренд, который подставить площадке сразу
+ * (например, открыта его вкладка).
+ */
+export function CampaignForm({ open, onClose, initial, defaultAdvertiserId }) {
   const { mutate: saveCampaign, isPending } = useSaveCampaign()
   const { data: advertisers = [] } = useVisibleAdvertisers()
   const { user, isAdmin, isAdvertiser } = useAuth()
@@ -107,9 +115,17 @@ export function CampaignForm({ open, onClose, initial }) {
   const [form, setForm] = useState(emptyForm)
   const [errors, setErrors] = useState({})
 
-  // Бренд заявки: у рекламодателя свой, у площадки — бренд правимой кампании.
-  // Сменить его нельзя: на создании сервер берёт бренд из сессии автора.
-  const advertiserId = editing ? initial.advertiserId : user?.advertiserId
+  // Бренд выбирает площадка, когда сама заводит заявку: своего бренда у неё
+  // нет, и сервер ждёт `advertiserId` в теле.
+  const pickBrand = !editing && !isAdvertiser
+  // Бренд заявки: у рекламодателя свой — сервер берёт его из сессии, у
+  // правимой кампании — её, у новой заявки площадки — выбранный. У уже
+  // заведённой заявки бренд не меняется.
+  const advertiserId = editing
+    ? initial.advertiserId
+    : pickBrand
+      ? form.advertiserId
+      : user?.advertiserId
   const advertiser = advertisers.find((a) => a.id === advertiserId)
   // Договоры бренда — из них выбирается номер, всё остальное сервер
   // подставит в кампанию сам.
@@ -127,7 +143,11 @@ export function CampaignForm({ open, onClose, initial }) {
 
   useEffect(() => {
     if (!open) return
-    setForm(initial ? formFrom(initial) : emptyForm)
+    setForm(
+      initial
+        ? formFrom(initial)
+        : { ...emptyForm, advertiserId: defaultAdvertiserId ?? null },
+    )
     setErrors({})
     // Зависимости — по id: после сохранения список обновится, и форма иначе
     // сбросила бы несохранённые правки сама на себя.
@@ -135,6 +155,12 @@ export function CampaignForm({ open, onClose, initial }) {
   }, [open, initial?.id])
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
+
+  /** Сменили бренд — его договоры другие, выбранный номер сбрасываем. */
+  const pickAdvertiser = (id) => {
+    setForm((f) => ({ ...f, advertiserId: id, contractNumber: '' }))
+    setErrors((e) => ({ ...e, advertiserId: undefined }))
+  }
 
   /**
    * Выбрали рекламную кампанию — вместе с ней подтягивается ролик договора.
@@ -156,6 +182,8 @@ export function CampaignForm({ open, onClose, initial }) {
 
   const submit = () => {
     const err = {}
+    if (pickBrand && !form.advertiserId)
+      err.advertiserId = 'Выберите рекламодателя'
     if (!form.name.trim()) err.name = 'Укажите название'
     if (!form.startDate) err.startDate = 'Укажите начало периода'
     if (!form.endDate) err.endDate = 'Укажите окончание периода'
@@ -178,9 +206,11 @@ export function CampaignForm({ open, onClose, initial }) {
       contractNumber: form.contractNumber.trim(),
       ...creativeInput(creative),
     }
-    // Статус ведёт площадка, и только у существующей заявки: новая всегда
-    // заводится как «Отправлен».
+    // Статус ведёт площадка, и только у существующей заявки: новую сервер
+    // заводит сам — «Отправлен» у рекламодателя, «Получен» у площадки.
     if (editing && isAdmin) campaign.status = form.status
+    // Площадка заводит заявку за бренд — без него сервер отвечает 400.
+    if (pickBrand) campaign.advertiserId = form.advertiserId
 
     saveCampaign(
       { id: initial?.id, campaign },
@@ -241,6 +271,25 @@ export function CampaignForm({ open, onClose, initial }) {
       }
     >
       <div className="space-y-4">
+        {/* Площадка сначала выбирает рекламодателя: от него зависят договоры. */}
+        {pickBrand && (
+          <Field label="Рекламодатель" required error={errors.advertiserId}>
+            <Select
+              value={form.advertiserId ?? ''}
+              onChange={(e) => pickAdvertiser(Number(e.target.value) || null)}
+            >
+              <option value="">— выберите рекламодателя —</option>
+              {[...advertisers]
+                .sort((a, b) => a.name.localeCompare(b.name, 'ru'))
+                .map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+            </Select>
+          </Field>
+        )}
+
         {/* Период кампании идёт первым — с него начинают заполнять форму. */}
         <div>
           <p className="mb-2 text-[13px] font-medium text-ink-soft">
