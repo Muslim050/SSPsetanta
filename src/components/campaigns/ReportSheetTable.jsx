@@ -59,9 +59,29 @@ const spot = (key, label) => ({
   group: SPOTS_GROUP,
 })
 
+// Прямой эфир: Live spot SS1/SS2, а без post — OTT (LIVE).
+const LIVE_COLUMNS = [
+  { key: 'date', label: 'Date', type: 'date', accent: true },
+  { key: 'time', label: 'Time', type: 'time', accent: true },
+  { key: 'tournament', label: 'Tournament', type: 'text' },
+  // Event уже, чтобы место досталось блоку выходов.
+  { key: 'event', label: 'Event', type: 'text', width: 'w-[220px]' },
+  spot('pre', 'pre'),
+  spot('mid1', 'mid'),
+  spot('mid2', 'mid'),
+  spot('post', 'post'),
+  {
+    key: 'views',
+    label: 'Views',
+    type: 'number',
+    nullable: true,
+    group: SPOTS_GROUP,
+  },
+]
+
 /**
  * Колонки по форме листа. Таблицу выбираем по `kind`, а не по коду листа:
- * логов выходов четыре, эфиров два, соцсеть одна — форм всего три.
+ * логов выходов четыре, эфиров два — форм всего пять.
  * `accent` — дата и время выхода, их красим так же, как в файле.
  * `group` — общая подпись над колонками во второй строке шапки.
  * `nullable` — пустое число остаётся пустым, а не становится нулём.
@@ -74,23 +94,15 @@ const COLUMNS = {
     { key: 'date', label: 'Date', type: 'date', accent: true },
     { key: 'time', label: 'Time', type: 'time', accent: true },
   ],
-  live_event: [
-    { key: 'date', label: 'Date', type: 'date', accent: true },
-    { key: 'time', label: 'Time', type: 'time', accent: true },
-    { key: 'tournament', label: 'Tournament', type: 'text' },
-    // Event уже, чтобы место досталось блоку выходов.
-    { key: 'event', label: 'Event', type: 'text', width: 'w-[220px]' },
-    spot('pre', 'pre'),
-    spot('mid1', 'mid'),
-    spot('mid2', 'mid'),
-    spot('post', 'post'),
-    {
-      key: 'views',
-      label: 'Views',
-      type: 'number',
-      nullable: true,
-      group: SPOTS_GROUP,
-    },
+  live_event: LIVE_COLUMNS,
+  ott_live: LIVE_COLUMNS.filter((column) => column.key !== 'post'),
+  // Прероллы OTT: процент, число прероллов и период — в файле он одной
+  // ячейкой «01/09/2026-30/09/2026», в API — двумя датами.
+  preroll: [
+    { key: 'percent', label: '%', type: 'percent' },
+    { key: 'prerolls', label: 'Prerolls', type: 'number' },
+    { key: 'dateFrom', label: 'с', type: 'date', accent: true, group: 'Date' },
+    { key: 'dateTo', label: 'по', type: 'date', accent: true, group: 'Date' },
   ],
   social: [
     { key: 'link', label: 'Ссылка', type: 'text' },
@@ -112,11 +124,20 @@ const EMPTY_ROW = {
     post: null,
     views: null,
   }),
+  // Новые поля выходов сервер требует и у новых строк — пустыми, null.
+  ott_live: () => ({
+    date: '',
+    time: '',
+    tournament: '',
+    event: '',
+    pre: null,
+    mid1: null,
+    mid2: null,
+    views: null,
+  }),
+  preroll: () => ({ percent: '', prerolls: 0, dateFrom: '', dateTo: '' }),
   social: (network) => ({ network, link: '', impressions: 0 }),
 }
-
-// Без скрытых колонок. Постоянный массив, чтобы не сбивать мемоизацию.
-const NO_COLUMNS = []
 
 /**
  * Соседние элементы с одинаковым ключом — одной ячейкой шапки: так группа
@@ -142,7 +163,7 @@ const headClass = (column, span = 1) =>
         ? cn('text-center', span > 1 ? 'w-32' : 'w-16')
         : column.brand
           ? 'min-w-[140px] text-center'
-          : column.type === 'number'
+          : column.type === 'number' || column.type === 'percent'
             ? 'w-[140px] text-right'
             : cn('text-left', column.width),
   )
@@ -153,6 +174,8 @@ const NETWORK_ORDER = ['instagram', 'telegram']
 const EYEBROW = {
   spot_log: 'Broadcast log',
   live_event: 'Live events',
+  ott_live: 'OTT live',
+  preroll: 'OTT preroll',
   social: 'Social media report',
 }
 
@@ -170,7 +193,33 @@ function display(column, value) {
   if (value === '' || value === null || value === undefined) return '—'
   if (column.type === 'date') return isoToRu(value)
   if (column.type === 'number') return formatNumber(value)
+  if (column.type === 'percent') return formatPercent(value)
   return value
+}
+
+// Процент — до сотых, как его хранит сервер: 4,99.
+const formatPercent = (value) =>
+  Number(value).toLocaleString('ru-RU', { maximumFractionDigits: 2 })
+
+/**
+ * Процент в поле правки: цифры и одна точка, не больше двух знаков после
+ * неё. В черновике он строкой — иначе «4.» превращалось бы в 4 прямо
+ * при наборе; числом становится перед отправкой (см. toPercent).
+ */
+const toPercentInput = (value) => {
+  const [whole, ...rest] = String(value)
+    .replace(/,/g, '.')
+    .replace(/[^\d.]/g, '')
+    .split('.')
+  return rest.length ? `${whole}.${rest.join('').slice(0, 2)}` : whole
+}
+
+/** Процент из черновика → число для сервера; пусто — null. */
+const toPercent = (value) => {
+  const text = String(value ?? '').trim()
+  if (!text) return null
+  const number = Number(text)
+  return Number.isFinite(number) ? number : null
 }
 
 /**
@@ -188,6 +237,21 @@ const editValue = (column, value) =>
   column.nullable && (value === null || value === undefined)
     ? ''
     : formatNumber(value)
+
+/**
+ * Итоги эфиров по строкам — так же, как их считает сервер (`totals`):
+ * пустое значение — ноль, `seconds` — сумма всех колонок выходов.
+ */
+const liveTotals = (rows, spotKeys) => {
+  const sum = (key) =>
+    rows.reduce((total, row) => total + (Number(row[key]) || 0), 0)
+  const totals = { rows: rows.length, views: sum('views'), seconds: 0 }
+  for (const key of spotKeys) {
+    totals[key] = sum(key)
+    totals.seconds += totals[key]
+  }
+  return totals
+}
 
 // Блоки красим, как в файле: выходы — красным (как дата и время в шапке),
 // бренды — зелёным.
@@ -236,15 +300,19 @@ const EditRow = memo(function EditRow({
           >
             <input
               type={
-                column.type === 'number'
+                ['number', 'percent', 'text'].includes(column.type)
                   ? 'text'
-                  : column.type === 'text'
-                    ? 'text'
-                    : column.type
+                  : column.type
               }
               // Время с секундами: так оно записано в файле.
               step={column.type === 'time' ? 1 : undefined}
-              inputMode={column.type === 'number' ? 'numeric' : undefined}
+              inputMode={
+                column.type === 'number'
+                  ? 'numeric'
+                  : column.type === 'percent'
+                    ? 'decimal'
+                    : undefined
+              }
               value={
                 column.type === 'number'
                   ? editValue(column, row[column.key])
@@ -257,7 +325,9 @@ const EditRow = memo(function EditRow({
                   column.key,
                   column.type === 'number'
                     ? toCount(e.target.value, column.nullable)
-                    : e.target.value,
+                    : column.type === 'percent'
+                      ? toPercentInput(e.target.value)
+                      : e.target.value,
                 )
               }
               aria-invalid={!!error}
@@ -295,11 +365,6 @@ const EditRow = memo(function EditRow({
  *
  * У соцсети лист один на обе сети, а вкладок две: `network` показывает
  * только строки своей сети, а при сохранении вторая сеть уходит нетронутой.
- *
- * `onSave(rows)` — свой способ сохранить вместо сервера: так таблицу берут
- * разделы, которых в файле отчёта нет (OTT живёт в браузере).
- * `hiddenColumns` — ключи колонок, которых в этом разделе нет (у OTT — post).
- * Передавайте постоянным массивом: от него зависит мемоизация строк.
  */
 export function ReportSheetTable({
   sheet,
@@ -308,9 +373,6 @@ export function ReportSheetTable({
   network,
   title,
   subtitle,
-  onSave,
-  emptyHint = 'В загруженном файле этот лист пустой.',
-  hiddenColumns = NO_COLUMNS,
 }) {
   const { canEdit, isAdvertiser } = useAuth()
   // Загружать и править отчёт может только площадка.
@@ -320,7 +382,7 @@ export function ReportSheetTable({
 
   const isSocial = sheet.kind === 'social'
   // Бренды «Total ads spots» заводят только у эфиров: Live spot и OTT.
-  const isLive = sheet.kind === 'live_event'
+  const isLive = sheet.kind === 'live_event' || sheet.kind === 'ott_live'
 
   // Строки этой вкладки: у соцсети — только своей сети.
   const rows = useMemo(
@@ -340,13 +402,8 @@ export function ReportSheetTable({
 
   const brandCount = isLive ? countBrands(shown) : 0
   const columns = useMemo(
-    () => [
-      ...COLUMNS[sheet.kind].filter(
-        (column) => !hiddenColumns.includes(column.key),
-      ),
-      ...brandColumns(brandCount),
-    ],
-    [sheet.kind, brandCount, hiddenColumns],
+    () => [...COLUMNS[sheet.kind], ...brandColumns(brandCount)],
+    [sheet.kind, brandCount],
   )
 
   // Сменили лист или месяц — незаконченную правку не тащим за собой.
@@ -461,21 +518,21 @@ export function ReportSheetTable({
     return result
   }
 
-  const save = () => {
-    if (onSave) {
-      try {
-        onSave(draft)
-      } catch {
-        toast.error('Не удалось сохранить таблицу')
-        return
-      }
-      setDraft(null)
-      setCellErrors({})
-      toast.success(`${title}: таблица сохранена`)
-      return
-    }
+  // Проценты в черновике — строки, как их набрали; серверу — числа.
+  const percentKeys = columns
+    .filter((column) => column.type === 'percent')
+    .map((column) => column.key)
+  const toPayload = (edited) =>
+    percentKeys.length
+      ? edited.map((row) => {
+          const next = { ...row }
+          for (const key of percentKeys) next[key] = toPercent(row[key])
+          return next
+        })
+      : edited
 
-    const { all, offset } = buildRows(draft)
+  const save = () => {
+    const { all, offset } = buildRows(toPayload(draft))
     saveSheet(
       {
         contractId,
@@ -517,17 +574,25 @@ export function ReportSheetTable({
 
   // Шапка в две строки, если у колонок есть общая подпись группы.
   const grouped = columns.some((column) => column.group)
-  // Итог по выходам, как под таблицей в файле: сколько эфиров с выходом
-  // в каждой колонке и сколько выходов всего. Колонки выходов идут подряд.
+  // Итоги эфиров — строка «Итого» файла: сумма секунд по колонкам выходов,
+  // просмотры и весь хронометраж. Колонки выходов идут подряд,
+  // сразу за ними — Views.
   const firstSpot = columns.findIndex((column) => column.spot)
-  const spotCounts = columns
+  const spotKeys = columns
     .filter((column) => column.spot)
-    .map((column) => ({
-      key: column.key,
-      count: shown.filter((row) => Number(row[column.key]) > 0).length,
-    }))
-  const spotsTotal = spotCounts.reduce((sum, { count }) => sum + count, 0)
-  const afterSpots = columns.length - firstSpot - spotCounts.length
+    .map((column) => column.key)
+  const hasViews = columns.some((column) => column.key === 'views')
+  // После выходов: Views (если есть), бренды и колонка удаления при правке.
+  const afterSpots =
+    columns.length - firstSpot - spotKeys.length + (editing ? 1 : 0)
+  const totals =
+    firstSpot < 0
+      ? null
+      : // В просмотре — серверные `totals` листа; при правке их ещё нет —
+        // считаем по черновику так же, как сервер: пустое значение — ноль.
+        !editing && sheet.totals && 'seconds' in sheet.totals
+        ? sheet.totals
+        : liveTotals(shown, spotKeys)
 
   return (
     <Card className="relative overflow-hidden">
@@ -706,7 +771,7 @@ export function ReportSheetTable({
                   <p className="mt-1 text-[13px] text-ink-muted">
                     {editing
                       ? 'Добавьте строку или отмените правку.'
-                      : emptyHint}
+                      : 'В загруженном файле этот лист пустой.'}
                   </p>
                 </td>
               </tr>
@@ -743,7 +808,9 @@ export function ReportSheetTable({
                           column.accent && 'text-center tnum',
                           column.spot
                             ? 'text-center tnum'
-                            : column.type === 'number' && 'text-right tnum',
+                            : (column.type === 'number' ||
+                                column.type === 'percent') &&
+                                'text-right tnum',
                           column.brand && 'text-center',
                           GROUP_CELL[column.group],
                           column.key === 'link' && 'max-w-0 truncate',
@@ -767,45 +834,54 @@ export function ReportSheetTable({
                   </tr>
                 ))}
           </tbody>
-          {firstSpot >= 0 && shown.length > 0 && (
+          {totals && shown.length > 0 && (
             <tfoot className="sticky bottom-0 z-10 bg-paper text-[13px] font-semibold text-ink tnum">
               <tr className="border-t border-line">
                 <td
                   colSpan={firstSpot + 1}
                   className="px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-ink-muted"
                 >
-                  Эфиров с выходом
+                  Сумма секунд
                 </td>
-                {spotCounts.map(({ key, count }) => (
+                {spotKeys.map((key) => (
                   <td
                     key={key}
                     className="border-l border-line px-2 py-2 text-center"
                   >
-                    {formatNumber(count)}
+                    {formatNumber(totals[key])}
                   </td>
                 ))}
-                <td
-                  colSpan={afterSpots + (editing ? 1 : 0)}
-                  className="border-l border-line"
-                />
+                {hasViews && (
+                  <td className="border-l border-line px-3 py-2 text-right">
+                    <span className="block whitespace-nowrap text-[10px] font-medium uppercase tracking-wider text-ink-muted">
+                      Сумма просмотров
+                    </span>
+                    {formatNumber(totals.views)}
+                  </td>
+                )}
+                {afterSpots - (hasViews ? 1 : 0) > 0 && (
+                  <td
+                    colSpan={afterSpots - (hasViews ? 1 : 0)}
+                    className="border-l border-line"
+                  />
+                )}
               </tr>
               <tr className="border-t border-line">
                 <td
                   colSpan={firstSpot + 1}
                   className="px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-ink-muted"
                 >
-                  Всего выходов
+                  Итого секунд
                 </td>
                 <td
-                  colSpan={spotCounts.length}
+                  colSpan={spotKeys.length}
                   className="border-l border-line px-2 py-2 text-center"
                 >
-                  {formatNumber(spotsTotal)}
+                  {formatNumber(totals.seconds)}
                 </td>
-                <td
-                  colSpan={afterSpots + (editing ? 1 : 0)}
-                  className="border-l border-line"
-                />
+                {afterSpots > 0 && (
+                  <td colSpan={afterSpots} className="border-l border-line" />
+                )}
               </tr>
             </tfoot>
           )}

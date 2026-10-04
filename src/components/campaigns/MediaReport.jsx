@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useMutationState } from '@tanstack/react-query'
 import {
@@ -17,7 +17,9 @@ import {
   useReport,
   useReportImports,
   useReportMonths,
+  useManualReport,
 } from '@/features/reports/queries'
+import { reportSummary, spotSummary } from '@/features/reports/summary'
 import { fileHref } from '@/features/files/download'
 import { useToast } from '@/components/ui/Toast.jsx'
 import { useConfirm } from '@/components/ui/Confirm.jsx'
@@ -27,7 +29,6 @@ import { formatDateTime } from '@/lib/format.js'
 import { cn } from '@/lib/cn.js'
 import { MONTHS_FULL } from './MonthTabs.jsx'
 import { CampaignTabs, useCampaignTabs } from './CampaignMediaTabs.jsx'
-import { OttSheetTable } from './OttSheetTable.jsx'
 import { ReportSheetTable } from './ReportSheetTable.jsx'
 import { Materialize, TableGenerating } from './ReportUploadEffects.jsx'
 import {
@@ -76,6 +77,13 @@ const REPORT_GROUPS = [
         network: 'telegram',
         label: 'Telegram',
       },
+    ],
+  },
+  {
+    name: 'OTT',
+    items: [
+      { value: 'ottlive', code: 'ottlive', label: 'Live spot' },
+      { value: 'ottpreroll', code: 'ottpreroll', label: 'Preroll' },
     ],
   },
 ].map((group) => ({
@@ -186,6 +194,8 @@ const SHEET_SHORT = {
   promo1: 'Promo SS1',
   promo2: 'Promo SS2',
   social: 'Social',
+  ottlive: 'OTT Live',
+  ottpreroll: 'OTT Preroll',
 }
 
 /**
@@ -292,12 +302,13 @@ function ReportFileBar({ contractId, period, months, report, onImported }) {
       toast.error('Нужен файл Excel в формате .xlsx')
       return
     }
-    // Повторная загрузка заменяет месяц целиком — вместе с ручными правками.
-    if (loaded) {
+    // Повторная загрузка заменяет файловый отчёт месяца целиком — вместе с
+    // правками листов. Ручной отчёт (цифры Spot) отдельный, его она не трогает.
+    if (loaded && report.data.reportType !== 'manual') {
       const ok = await confirm({
         title: 'Заменить отчёт?',
         description: `Отчёт за ${month} уже загружен`,
-        body: 'Все листы месяца заменятся данными из нового файла, ручные правки пропадут. Прежний файл останется в истории загрузок.',
+        body: 'Все листы месяца заменятся данными из нового файла, ручные правки листов пропадут. Прежний файл останется в истории загрузок.',
         confirmText: 'Заменить',
       })
       if (!ok) return
@@ -344,9 +355,11 @@ function ReportFileBar({ contractId, period, months, report, onImported }) {
         : report.isPending && report.fetchStatus !== 'idle'
           ? `Загружаем отчёт за ${month}…`
           : loaded
-            ? lastImport
-              ? `Файл загружен ${formatDateTime(lastImport.at)} · ${lastImport.by}`
-              : `Обновлён ${formatDateTime(report.data.updatedAt)}`
+            ? report.data.reportType === 'manual'
+              ? `Отчёт введён вручную на вкладке Spot · ${formatDateTime(report.data.updatedAt)}`
+              : lastImport
+                ? `Файл загружен ${formatDateTime(lastImport.at)} · ${lastImport.by}`
+                : `Обновлён ${formatDateTime(report.data.updatedAt)}`
             : canUpload
               ? `Файл статистики за ${month} ещё не загружен`
               : // Загружает только площадка: остальным говорим, что отчёт
@@ -473,7 +486,7 @@ function ReportFileBar({ contractId, period, months, report, onImported }) {
                 <span className="mx-auto mt-1 block max-w-xl text-[13px] text-ink-muted">
                   Перетащите файл .xlsx сюда или выберите его на компьютере.
                   Нужен «Шаблон импортируемого отчёта Setanta Statistics» — все
-                  семь листов, даты за этот месяц.
+                  девять листов, даты за этот месяц.
                 </span>
               </span>
               {/* Кнопка — только вид: нажатие ловит вся зона-подпись. */}
@@ -578,12 +591,12 @@ function ReportFileBar({ contractId, period, months, report, onImported }) {
 }
 
 /**
- * Отчёт по договору за месяц: сводки, листы из загруженного файла и
- * категории, которые пока живут в браузере.
+ * Отчёт по договору за месяц: сводки и листы из загруженного файла.
  *
- * Листы — эфиры, логи выходов, промо и соцсети — приходят с сервера. Сводки
- * Total и Spot и категория OTT остаются демонстрационными: в файле их нет.
- * Без договора листов нет — отчёт ведётся по договору.
+ * Листы — эфиры, логи выходов, промо, соцсети и OTT — приходят с сервера.
+ * Сводки Total и Spot считаются из этих листов; вручную в Total ведутся
+ * только устройства и география. Без договора листов нет — отчёт ведётся
+ * по договору.
  */
 export function MediaReport({
   className,
@@ -607,10 +620,20 @@ export function MediaReport({
   // сервер отвечает 404. Только что загруженный отчёт уже лежит в кэше.
   const report = useReport(contractId, period, { enabled: inList })
   const sheets = report.data?.sheets ?? []
+  // Сводки Statistic: null — за месяц отчёта нет (или он ещё грузится).
+  const summary = useMemo(
+    () => (report.data ? reportSummary(report.data) : null),
+    [report.data],
+  )
+  const summaryLoading = report.isPending && report.fetchStatus !== 'idle'
+  // Цифры Spot — отдельный ручной отчёт месяца (`GET …/manual`).
+  const manual = useManualReport(contractId, period)
+  const spot = useMemo(() => spotSummary(manual.data), [manual.data])
 
   const { groups, tabs, addCategory, removeCategory } = useCampaignTabs(
     contractId ?? 'default',
-    report.data ? REPORT_GROUPS : [],
+    // У ручного отчёта листов нет — только цифры вкладки Spot.
+    report.data?.sheets?.length ? REPORT_GROUPS : [],
   )
   const current = tabs.find((item) => item.value === tab)
 
@@ -677,9 +700,18 @@ export function MediaReport({
               transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
             >
               {tab === 'stats' ? (
-                <TotalStatisticsReport />
+                <TotalStatisticsReport
+                  summary={summary}
+                  loading={summaryLoading}
+                />
               ) : tab === 'channels' ? (
-                <ChannelSummaryReport />
+                <ChannelSummaryReport
+                  key={`${contractId}-${period}`}
+                  spot={spot}
+                  loading={manual.isPending && manual.fetchStatus !== 'idle'}
+                  contractId={contractId}
+                  period={period}
+                />
               ) : sheet ? (
                 <ReportSheetTable
                   key={`${contractId}-${period}-${current.value}`}
@@ -689,15 +721,6 @@ export function MediaReport({
                   network={current.network}
                   title={`${current.group} — ${current.label}`}
                   subtitle={`Лист «${sheet.title}» · ${periodLabel(period)}`}
-                />
-              ) : current?.kind === 'log' ? (
-                <OttSheetTable
-                  key={`${contractId}-${period}-${tab}`}
-                  contractId={contractId}
-                  period={period}
-                  channelId={tab}
-                  title={`${current.group} — ${current.label}`}
-                  subtitle={`${current.group} · ${periodLabel(period)}`}
                 />
               ) : null}
             </motion.div>

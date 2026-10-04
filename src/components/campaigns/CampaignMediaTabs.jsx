@@ -18,22 +18,13 @@ const CAMPAIGN_TABS = [
 ]
 
 /**
- * Категории, которые добавляют руками. Эфиры, логи выходов, промо и
- * соцсети приходят листами из загруженного файла — их вкладки постоянные
- * (см. MediaReport). Руками остаётся только OTT: в файле его нет, и данные
- * живут в браузере, пока бэкенд их не примет.
+ * Категории, которые добавляют руками: { name, kind, hint, channels }.
+ * Сейчас их нет — эфиры, логи выходов, промо, соцсети и OTT приходят листами
+ * из загруженного файла, их вкладки постоянные (см. MediaReport). Пока список
+ * пуст, кнопка «Добавить категорию» не показывается, а сохранённые раньше
+ * категории (OTT из браузера) отбрасываются при чтении.
  */
-export const CATEGORY_PRESETS = [
-  {
-    name: 'OTT',
-    kind: 'log',
-    hint: 'Эфиры Live spot и Preroll',
-    channels: [
-      { id: 'ott_live', label: 'Live spot' },
-      { id: 'ott_preroll', label: 'Preroll' },
-    ],
-  },
-]
+export const CATEGORY_PRESETS = []
 
 /** Категория с её каналами — из пресета по названию. */
 function categoryFromPreset(name, categoryId) {
@@ -173,8 +164,12 @@ export function CampaignTabs({
     canRight,
     scrollBy,
   } = useHorizontalScroll(value)
-  // Собирать отчёт может только площадка.
-  const canAdd = Boolean(onAddCategory) && canEdit && !isAdvertiser
+  // Собирать отчёт может только площадка — и только если есть что добавить.
+  const canAdd =
+    Boolean(onAddCategory) &&
+    canEdit &&
+    !isAdvertiser &&
+    CATEGORY_PRESETS.length > 0
   // Крестики у категорий показываем только в режиме правки — по карандашу.
   const [editing, setEditing] = useState(false)
 
