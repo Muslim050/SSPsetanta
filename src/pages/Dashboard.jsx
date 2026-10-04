@@ -131,35 +131,6 @@ function AddButton({ onClick, children }) {
   )
 }
 
-function MediaMetric({ item, editing, onChange }) {
-  const Icon = ICONS[item.icon] ?? RadioTower
-  return (
-    <div className="group rounded-2xl border border-line bg-surface p-4 shadow-soft transition-colors hover:border-indigo-300">
-      <div className="flex items-center justify-between gap-3">
-        <span className="min-w-0 flex-1 text-[11px] font-medium uppercase tracking-[0.12em] text-ink-muted">
-          <EditText
-            editing={editing}
-            value={item.label}
-            onChange={(label) => onChange({ ...item, label })}
-          />
-        </span>
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-900 transition-transform group-hover:scale-105">
-          <Icon size={16} />
-        </span>
-      </div>
-      <div className="mt-3 font-display text-2xl font-semibold text-ink tnum">
-        <EditNumber
-          editing={editing}
-          value={item.value}
-          onChange={(value) => onChange({ ...item, value })}
-        >
-          {formatNumber(item.value)}
-        </EditNumber>
-      </div>
-    </div>
-  )
-}
-
 function SocialChannelCard({ channel, editing, onChange, onRemove }) {
   const Icon = ICONS[channel.icon] ?? Instagram
   const max = Math.max(1, ...channel.rows.map((row) => row.value))
@@ -295,7 +266,7 @@ function SocialChannelCard({ channel, editing, onChange, onRemove }) {
 }
 
 function MediaSummary({ data, editing, patch }) {
-  const { summary, mediaTotals, socialChannels } = data
+  const { summary, socialChannels } = data
 
   return (
     <>
@@ -315,68 +286,7 @@ function MediaSummary({ data, editing, patch }) {
                 onChange={(title) => patch({ summary: { ...summary, title } })}
               />
             </h2>
-            <div className="mt-1 max-w-xl text-sm text-ink-muted">
-              <EditText
-                editing={editing}
-                value={summary.subtitle}
-                onChange={(subtitle) =>
-                  patch({ summary: { ...summary, subtitle } })
-                }
-              />
-            </div>
           </div>
-          <div className="flex gap-6 rounded-2xl border border-line bg-surface/90 px-5 py-3.5 shadow-soft backdrop-blur-sm">
-            <div>
-              <p className="text-[10px] uppercase tracking-wider text-ink-muted">
-                Публикации
-              </p>
-              <div className="mt-1 font-display text-lg font-semibold text-ink tnum">
-                <EditNumber
-                  editing={editing}
-                  value={summary.publications}
-                  onChange={(publications) =>
-                    patch({ summary: { ...summary, publications } })
-                  }
-                >
-                  {summary.publications}
-                </EditNumber>
-              </div>
-            </div>
-            <div className="h-10 w-px bg-line" />
-            <div>
-              <p className="text-[10px] uppercase tracking-wider text-ink-muted">
-                Показы в соцсетях
-              </p>
-              <div className="mt-1 font-display text-lg font-semibold text-ink tnum">
-                <EditNumber
-                  editing={editing}
-                  value={summary.socialImpressions}
-                  onChange={(socialImpressions) =>
-                    patch({ summary: { ...summary, socialImpressions } })
-                  }
-                >
-                  {formatNumber(summary.socialImpressions)}
-                </EditNumber>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="relative mt-6 grid grid-cols-2 gap-3 lg:grid-cols-5">
-          {mediaTotals.map((item) => (
-            <MediaMetric
-              key={item.id}
-              item={item}
-              editing={editing}
-              onChange={(next) =>
-                patch({
-                  mediaTotals: mediaTotals.map((m) =>
-                    m.id === next.id ? next : m,
-                  ),
-                })
-              }
-            />
-          ))}
         </div>
       </section>
 

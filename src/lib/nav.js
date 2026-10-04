@@ -15,8 +15,14 @@ export const NAV = [
     roles: ['admin', 'viewer', 'advertiser'],
   },
   {
+    to: '/app/agreements',
+    label: 'Договоры',
+    icon: FileText,
+    roles: ['advertiser', 'admin'],
+  },
+  {
     to: '/app/overview',
-    label: 'Обзор',
+    label: 'Статистика',
     icon: LayoutDashboard,
     roles: ['admin', 'viewer'],
   },
@@ -41,7 +47,7 @@ export const NAV = [
   },
   {
     to: '/app/reports',
-    label: 'Отчёт',
+    label: 'Статистика',
     icon: LineChart,
     roles: ['advertiser'],
   },

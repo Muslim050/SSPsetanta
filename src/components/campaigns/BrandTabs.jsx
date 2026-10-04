@@ -6,8 +6,15 @@ import { cn } from '@/lib/cn.js'
  * Вкладки брендов над таблицей кампаний: переносятся по строкам, чтобы все
  * бренды были на виду. На узких экранах — лента с прокруткой.
  * items: [{ id, name, color, logo, count, active, sent }], value, onChange
+ * noun — что считают счётчики, для подсказок: «кампаний», «договоров».
  */
-export function BrandTabs({ items, value, onChange, className }) {
+export function BrandTabs({
+  items,
+  value,
+  onChange,
+  className,
+  noun = 'кампаний',
+}) {
   const listRef = useRef(null)
   const activeRef = useRef(null)
   // Выбранный бренд может уехать за край — подтягиваем его в кадр.
@@ -73,7 +80,7 @@ export function BrandTabs({ items, value, onChange, className }) {
             {b.color && (
               <span
                 className="rounded-full bg-ink/6 px-1.5 text-[11px] font-medium text-ink-soft tnum"
-                title={`Всего кампаний: ${b.count}`}
+                title={`Всего ${noun}: ${b.count}`}
               >
                 {b.count}
               </span>
@@ -82,7 +89,7 @@ export function BrandTabs({ items, value, onChange, className }) {
             {b.active > 0 && (
               <span
                 className="flex items-center gap-1 rounded-full bg-emerald-50 px-1.5 text-[11px] font-medium text-emerald-700 tnum"
-                title={`Активных кампаний: ${b.active}`}
+                title={`Активных ${noun}: ${b.active}`}
               >
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                 {b.active}

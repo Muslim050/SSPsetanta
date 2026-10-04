@@ -14,6 +14,7 @@ import Campaigns from '@/pages/Campaigns.jsx'
 import CampaignStats from '@/pages/CampaignStats.jsx'
 import Advertisers from '@/pages/Advertisers.jsx'
 import ContractOverview from '@/pages/ContractOverview.jsx'
+import ContractList from '@/pages/ContractList.jsx'
 import Channels from '@/pages/Channels.jsx'
 import Reports from '@/pages/Reports.jsx'
 import NotFound from '@/pages/NotFound.jsx'
@@ -121,6 +122,16 @@ const channelsRoute = createRoute({
   component: Channels,
 })
 
+// Вкладка «Договоры»: рекламодателю — договоры его бренда без денег,
+// площадке — договоры всех брендов. Суммы и оплаты по месяцам — в Contract
+// Overview.
+const agreementsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: 'agreements',
+  beforeLoad: requireRoles(['advertiser', 'admin']),
+  component: ContractList,
+})
+
 const reportsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: 'reports',
@@ -144,6 +155,7 @@ const routeTree = rootRoute.addChildren([
     campaignsRoute,
     campaignStatsRoute,
     contractsRoute,
+    agreementsRoute,
     advertisersRoute,
     usersRoute,
     overviewRoute,

@@ -50,8 +50,15 @@ const PILLS = {
 /**
  * Карточка договора: те же плитки, что и в карточке кампании, но условия
  * берём из самого договора. Правки живут в ContractModal — здесь только чтение.
+ * `showBudget={false}` прячет плитку бюджета с историей выплат — так окно
+ * открывается во вкладке «Договоры» рекламодателя, где денег нет.
  */
-export function ContractPreviewModal({ contract, advertiser, onClose }) {
+export function ContractPreviewModal({
+  contract,
+  advertiser,
+  onClose,
+  showBudget = true,
+}) {
   const { canEdit, isAdvertiser } = useAuth()
   // const { update } = useData()
   const { mutate: updateContract } = useUpdateContract()
@@ -244,35 +251,37 @@ export function ContractPreviewModal({ contract, advertiser, onClose }) {
             ))}
 
             {/* Плитка оплаты: по клику раскрывается история выплат. */}
-            <button
-              type="button"
-              onClick={() => setShowPayments((v) => !v)}
-              title="История выплат"
-              className="group rounded-2xl border border-line bg-paper/55 p-4 text-left transition-colors hover:border-indigo-300 hover:bg-indigo-50 focus-ring"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-[11px] font-medium uppercase tracking-wider text-ink-muted">
-                  {isAdvertiser ? 'Бюджет / Оплачено' : 'Освоение бюджета'}
-                </span>
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-indigo-900 transition-transform group-hover:scale-105">
-                  <Gauge size={16} />
-                </span>
-              </div>
-              <p className="mt-3 flex items-baseline gap-1.5 text-[15px] font-semibold text-ink tnum">
-                {formatMoneyCompact(spent)}
-                <span className="text-[12px] font-medium text-ink-muted">
-                  из {formatMoneyCompact(budget)}
-                </span>
-              </p>
-              <Progress
-                value={pacing}
-                label={formatPct(pacing, 0)}
-                className="mt-2"
-              />
-            </button>
+            {showBudget && (
+              <button
+                type="button"
+                onClick={() => setShowPayments((v) => !v)}
+                title="История выплат"
+                className="group rounded-2xl border border-line bg-paper/55 p-4 text-left transition-colors hover:border-indigo-300 hover:bg-indigo-50 focus-ring"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[11px] font-medium uppercase tracking-wider text-ink-muted">
+                    {isAdvertiser ? 'Бюджет / Оплачено' : 'Освоение бюджета'}
+                  </span>
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-indigo-900 transition-transform group-hover:scale-105">
+                    <Gauge size={16} />
+                  </span>
+                </div>
+                <p className="mt-3 flex items-baseline gap-1.5 text-[15px] font-semibold text-ink tnum">
+                  {formatMoneyCompact(spent)}
+                  <span className="text-[12px] font-medium text-ink-muted">
+                    из {formatMoneyCompact(budget)}
+                  </span>
+                </p>
+                <Progress
+                  value={pacing}
+                  label={formatPct(pacing, 0)}
+                  className="mt-2"
+                />
+              </button>
+            )}
           </div>
 
-          {showPayments && (
+          {showBudget && showPayments && (
             <div className="mt-3 rounded-2xl border border-line bg-paper/55 p-4">
               <p className="text-[11px] font-medium uppercase tracking-wider text-ink-muted">
                 История выплат
