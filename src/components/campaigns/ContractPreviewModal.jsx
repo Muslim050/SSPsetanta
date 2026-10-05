@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Building2,
   CalendarRange,
@@ -27,6 +27,7 @@ import {
 import { Modal } from '@/components/ui/Modal.jsx'
 import { Button } from '@/components/ui/Button'
 import { Progress } from '@/components/ui/Progress.jsx'
+import { AnchoredPopover } from '@/components/ui/AnchoredPopover.jsx'
 import { ContractTile } from '@/components/campaigns/CampaignPreviewModal.jsx'
 import { cn } from '@/lib/cn.js'
 import { advertiserLogo } from '@/features/advertisers/logo'
@@ -64,25 +65,15 @@ export function ContractPreviewModal({
   const { mutate: updateContract } = useUpdateContract()
   const toast = useToast()
   const [showPayments, setShowPayments] = useState(false)
-  const [statusOpen, setStatusOpen] = useState(false)
-  const statusRef = useRef(null)
+  // Кнопка статуса, от которой открыт выбор; null — выбор закрыт.
+  const [statusAnchor, setStatusAnchor] = useState(null)
 
   // Статус договора ведёт площадка: рекламодателю он только показывается.
   const canEditStatus = canEdit && !isAdvertiser
   const status = contract?.status ?? 'active'
 
-  // Клик мимо списка статусов — закрываем его.
-  useEffect(() => {
-    const h = (e) =>
-      statusRef.current &&
-      !statusRef.current.contains(e.target) &&
-      setStatusOpen(false)
-    document.addEventListener('mousedown', h)
-    return () => document.removeEventListener('mousedown', h)
-  }, [])
-
   const setStatus = (next) => {
-    setStatusOpen(false)
+    setStatusAnchor(null)
     if (next === status) return
     updateContract(
       { id: contract.id, input: { status: next } },
@@ -100,7 +91,7 @@ export function ContractPreviewModal({
   // Открыли другой договор — историю снова прячем.
   useEffect(() => {
     setShowPayments(false)
-    setStatusOpen(false)
+    setStatusAnchor(null)
   }, [contract?.id])
 
   // Суммы приходят decimal-строками — в расчётах они нужны числами.
@@ -183,11 +174,13 @@ export function ContractPreviewModal({
                 </p>
               </div>
               {/* Статус договора: площадка меняет его прямо из карточки. */}
-              <div className="relative shrink-0" ref={statusRef}>
+              <div className="relative shrink-0">
                 <button
                   type="button"
                   disabled={!canEditStatus}
-                  onClick={() => setStatusOpen((v) => !v)}
+                  onClick={(e) =>
+                    setStatusAnchor(statusAnchor ? null : e.currentTarget)
+                  }
                   title={
                     canEditStatus
                       ? 'Изменить статус договора'
@@ -213,8 +206,13 @@ export function ContractPreviewModal({
                   )}
                 </button>
 
-                {statusOpen && (
-                  <div className="absolute right-0 top-full z-20 mt-1 w-48 overflow-hidden rounded-xl border border-line bg-surface p-1.5 shadow-lift">
+                {statusAnchor && (
+                  <AnchoredPopover
+                    anchorEl={statusAnchor}
+                    onClose={() => setStatusAnchor(null)}
+                    align="right"
+                    width={192}
+                  >
                     {Object.entries(CONTRACT_STATUS).map(([key, meta]) => (
                       <button
                         key={key}
@@ -239,7 +237,7 @@ export function ContractPreviewModal({
                         )}
                       </button>
                     ))}
-                  </div>
+                  </AnchoredPopover>
                 )}
               </div>
             </div>

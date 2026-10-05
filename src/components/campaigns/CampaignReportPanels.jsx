@@ -78,37 +78,20 @@ const SOCIAL_CHANNELS = [
   { id: 'telegram', name: 'Telegram', icon: Send, color: '#29B6F6' },
 ]
 
+// Карточки Total — ключи итогов `total-statistics` (из ручного отчёта).
 const TOTAL_METRICS = [
-  { key: 'liveEvents', label: 'Прямые эфиры', icon: RadioTower },
-  { key: 'eventPromo', label: 'Промо в эфире', icon: Tv },
-  { key: 'seconds', label: 'Хронометраж, сек.', icon: Timer },
+  // Выходы рекламы в прямых эфирах SS1 + SS2.
+  { key: 'liveCount', label: 'Прямые эфиры', icon: RadioTower },
+  { key: 'eventPromoCount', label: 'Промо в эфире', icon: Tv },
+  { key: 'totalSeconds', label: 'Хронометраж, сек.', icon: Timer },
   // Наблюдателю просмотры не показываем — как и в таблице размещений.
   {
-    key: 'views',
+    key: 'liveViews',
     label: 'Просмотры Live Ads',
     icon: PlayCircle,
     viewer: false,
   },
 ]
-
-/**
- * Демо-сводка для страницы «Статистика» рекламодателя: у неё нет договора и
- * месяца, отчёт ей взять неоткуда. В отчёте договора сводка считается
- * из листов (features/reports/summary).
- */
-const DEMO_SUMMARY = {
-  totals: {
-    liveEvents: 111,
-    eventPromo: 1295,
-    seconds: 32640,
-    views: 23708161,
-  },
-  social: {
-    instagram: { posts: 7, impressions: 188000 },
-    telegram: { posts: 7, impressions: 307000 },
-  },
-  unknownDuration: 0,
-}
 
 const DEVICE_SHARE = [
   { label: 'Браузер', value: 3, color: '#4A9BDF' },
@@ -162,14 +145,14 @@ function ReportHeader({ eyebrow, title, subtitle }) {
  */
 function SummaryEmpty({
   loading,
+  text: forced,
   adminText = 'Сводка посчитается из файла статистики — загрузите его за этот месяц.',
 }) {
   const { canEdit, isAdvertiser } = useAuth()
   const text = loading
     ? 'Загружаем отчёт за месяц…'
-    : canEdit && !isAdvertiser
-      ? adminText
-      : 'Отчёт в процессе формирования!'
+    : (forced ??
+      (canEdit && !isAdvertiser ? adminText : 'Отчёт в процессе формирования!'))
   return (
     <p className="relative mt-6 rounded-2xl border border-dashed border-indigo-300 bg-surface/70 px-4 py-6 text-center text-[13px] text-ink-muted">
       {text}
@@ -442,11 +425,13 @@ function TotalMetric({ metric, value }) {
         <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-ink-muted">
           {metric.label}
         </p>
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-100 text-indigo-900">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-indigo-900">
           <Icon size={16} />
         </span>
       </div>
-      <StatValue value={value} className="mt-3 text-2xl" />
+      {/* На телефоне карточки в две колонки: просмотры (8 знаков) в text-2xl
+          вылезают из карточки. */}
+      <StatValue value={value} className="mt-3 text-xl sm:text-2xl" />
     </div>
   )
 }
@@ -458,20 +443,24 @@ const TOTAL_SEED = {
 }
 
 /**
- * Total statistics. Эфир и соцсети — из отчёта за месяц (summary).
- * Устройств и географии в отчёте нет: показываем сохранённые раньше или
- * демо-значения, ручной правки здесь нет (см. docs/reports-backend-tasks.md, R1).
+ * Total statistics. Счётчики и соцсети — итоги сервера за месяц
+ * (`GET …/total-statistics`): счётчики из ручного отчёта, соцсети из листа
+ * файлового. Устройств и географии в API нет: показываем сохранённые раньше
+ * или демо-значения, ручной правки здесь нет (docs/reports-backend-tasks.md, R1).
  *
- * summary — reportSummary(листы); null — за месяц отчёта нет. Без пропа —
- * демо-сводка: так панель показывает страница «Статистика» рекламодателя.
- * `title` и `showMetrics` — для той же страницы: у неё свой заголовок и нет
- * эфирных карточек (прямые эфиры, промо, хронометраж, просмотры).
+ * summary — totalSummary(ответ); null — итоги ещё не пришли (loading) или не
+ * загрузились (error). `title` и `actions` (справа от заголовка) — для
+ * страницы «Статистика» рекламодателя: у неё свой заголовок и выбор периода.
+ * emptyNote — пояснение под карточками, когда все счётчики пустые; null —
+ * без пояснения.
  */
 export function TotalStatisticsReport({
-  summary = DEMO_SUMMARY,
+  summary,
   loading = false,
+  error = false,
   title = 'Общая статистика размещений',
-  showMetrics = true,
+  actions,
+  emptyNote = 'Цифры появятся, когда их заведут на вкладке Spot.',
 }) {
   // Наблюдателю не показываем просмотры, устройства и географию —
   // остаётся эфирная сводка и социальные сети.
@@ -501,15 +490,14 @@ export function TotalStatisticsReport({
             eyebrow="Total statistics"
             title={title}
             subtitle={
-              !showMetrics
-                ? 'Социальные сети, устройства и география аудитории.'
-                : isViewer
-                  ? 'Сводка эфира и социальных сетей.'
-                  : 'Сводка эфира, социальных сетей, устройств и географии аудитории.'
+              isViewer
+                ? 'Сводка эфира и социальных сетей.'
+                : 'Сводка эфира, социальных сетей, устройств и географии аудитории.'
             }
           />
+          {actions}
         </div>
-        {!showMetrics ? null : summary ? (
+        {summary ? (
           <div
             className={cn(
               'relative mt-6 grid grid-cols-2 gap-3',
@@ -525,20 +513,22 @@ export function TotalStatisticsReport({
             ))}
           </div>
         ) : (
-          <SummaryEmpty loading={loading} />
+          <SummaryEmpty
+            loading={loading}
+            text={error ? 'Не удалось загрузить итоги за месяц.' : undefined}
+          />
         )}
-        {showMetrics && summary?.manual && (
-          <p className="relative mt-2 text-[11px] text-ink-muted">
-            Отчёт за месяц введён вручную на вкладке Spot: числа прямых эфиров и
-            соцсетей в нём нет.
-          </p>
-        )}
-        {showMetrics && summary?.unknownDuration > 0 && (
-          <p className="relative mt-2 text-[11px] text-danger">
-            В хронометраж не вошли ролики Standard spot без длительности в
-            названии: {formatNumber(summary.unknownDuration)}.
-          </p>
-        )}
+        {/* Счётчики Total ведутся вручную на вкладке Spot: пока их не
+            завели, на карточках прочерк — объясняем почему. */}
+        {emptyNote &&
+          summary &&
+          TOTAL_METRICS.every(
+            (metric) => summary.totals[metric.key] == null,
+          ) && (
+            <p className="relative mt-2 text-[11px] text-ink-muted">
+              {emptyNote}
+            </p>
+          )}
       </section>
 
       <div
@@ -605,9 +595,7 @@ export function TotalStatisticsReport({
               })
             ) : (
               <p className="rounded-2xl bg-paper/60 px-3 py-4 text-center text-[12px] text-ink-muted">
-                {summary?.manual
-                  ? 'В ручном отчёте соцсетей нет.'
-                  : 'Появятся из листа соцсетей в отчёте за месяц.'}
+                Появятся из листа соцсетей в отчёте за месяц.
               </p>
             )}
           </div>

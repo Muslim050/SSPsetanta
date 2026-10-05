@@ -6,6 +6,7 @@ import { Field, Input } from '@/components/ui/Field'
 import { MONTHS_SHORT, MONTHS_FULL } from '@/components/campaigns/MonthTabs.jsx'
 import { formatDateTime } from '@/lib/format.js'
 import { cn } from '@/lib/cn.js'
+import { usePopoverPlacement } from '@/lib/usePopoverPlacement.js'
 
 const WIDTH = 300
 
@@ -156,11 +157,19 @@ export function StatusPopover({
   const arrowClass =
     'flex h-6 w-6 items-center justify-center rounded-lg text-ink-muted transition-colors focus-ring enabled:hover:bg-ink/6 enabled:hover:text-ink-soft disabled:opacity-35'
 
+  // Под ячейкой, а если не помещается — над ней; всегда в пределах экрана.
+  const placement = usePopoverPlacement(ref, anchor)
+
   return createPortal(
     <div
       ref={ref}
-      style={{ left, top: anchor.bottom + 8, width: WIDTH }}
-      className="fixed z-50 rounded-2xl border border-line bg-surface p-4 shadow-lift"
+      style={{
+        left,
+        top: placement.top,
+        width: WIDTH,
+        maxHeight: placement.maxHeight,
+      }}
+      className="fixed z-50 overflow-y-auto rounded-2xl border border-line bg-surface p-4 shadow-lift"
       onKeyDown={(e) => e.key === 'Enter' && save()}
     >
       <div className="flex items-start justify-between gap-3">

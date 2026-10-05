@@ -1,26 +1,17 @@
 import { useState } from 'react'
 import {
   Check,
-  Clapperboard,
   Eye,
   MessageSquare,
-  Instagram,
   MapPin,
   MonitorSmartphone,
   Pencil,
-  PlayCircle,
-  Plus,
-  RadioTower,
   RotateCcw,
-  Send,
   ThumbsDown,
   ThumbsUp,
   Timer,
   Youtube,
-  Trash2,
   Trophy,
-  Tv,
-  UsersRound,
   X,
 } from 'lucide-react'
 import { useAuth } from '@/features/auth/useAuth'
@@ -29,26 +20,14 @@ import { MonthTabs, MONTHS_FULL } from '@/components/campaigns/MonthTabs.jsx'
 import { SegmentTabs } from '@/components/ui/Tabs.jsx'
 import { useToast } from '@/components/ui/Toast.jsx'
 import { useConfirm } from '@/components/ui/Confirm.jsx'
-import { formatCompact, formatPct, formatNumber } from '@/lib/format.js'
+import { formatPct, formatNumber } from '@/lib/format.js'
 import { cloneOverview } from '@/lib/overviewSeed.js'
 import { PageHeader } from '@/components/PageHeader.jsx'
 import { Card } from '@/components/ui/Card.jsx'
 import { Button } from '@/components/ui/Button'
 import { SharePie } from '@/components/charts/SharePie.jsx'
 import { colorAt } from '@/components/charts/palette.js'
-import { uid } from '@/lib/id.js'
 import { cn } from '@/lib/cn.js'
-
-// Иконки в базе лежат ключами — здесь возвращаем их компоненты.
-const ICONS = {
-  RadioTower,
-  Clapperboard,
-  Tv,
-  Timer,
-  PlayCircle,
-  Instagram,
-  Send,
-}
 
 const inputClass =
   'w-full rounded-lg border border-indigo-300 bg-surface px-2 py-1 text-sm text-ink outline-hidden transition-colors focus:border-indigo-500 focus-ring'
@@ -79,194 +58,9 @@ function EditNumber({ editing, value, onChange, className, children }) {
   )
 }
 
-/** Кружок цвета: в режиме правки — нативный пикер. */
-function EditColor({ editing, value, onChange, className }) {
-  if (!editing) {
-    return (
-      <span
-        className={cn('shrink-0 rounded-full', className)}
-        style={{ backgroundColor: value }}
-      />
-    )
-  }
-  return (
-    <input
-      type="color"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      aria-label="Цвет"
-      className={cn(
-        'h-5 w-5 shrink-0 cursor-pointer rounded-full border border-line bg-transparent p-0',
-        className,
-      )}
-    />
-  )
-}
-
-/** Корзина у строки списка — только в режиме правки. */
-function RemoveButton({ onClick, label }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      title={label}
-      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-ink-muted transition-colors hover:bg-danger/10 hover:text-danger focus-ring"
-    >
-      <Trash2 size={14} />
-    </button>
-  )
-}
-
-function AddButton({ onClick, children }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-dashed border-indigo-300 px-3 py-1.5 text-[12px] font-medium text-indigo-800 transition-colors hover:border-indigo-500 hover:bg-indigo-50 focus-ring"
-    >
-      <Plus size={14} />
-      {children}
-    </button>
-  )
-}
-
-function SocialChannelCard({ channel, editing, onChange, onRemove }) {
-  const Icon = ICONS[channel.icon] ?? Instagram
-  const max = Math.max(1, ...channel.rows.map((row) => row.value))
-  const patch = (part) => onChange({ ...channel, ...part })
-
-  return (
-    <Card className="overflow-hidden">
-      <div className="flex items-center justify-between gap-4 border-b border-line p-5">
-        <div className="flex min-w-0 items-center gap-3">
-          <span
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-ink"
-            style={{ backgroundColor: channel.color }}
-          >
-            <Icon size={19} />
-          </span>
-          <div className="min-w-0">
-            <h3 className="font-display text-base font-semibold text-ink">
-              <EditText
-                editing={editing}
-                value={channel.name}
-                onChange={(name) => patch({ name })}
-              />
-            </h3>
-            <p className="flex items-center gap-2 text-[12px] text-ink-muted">
-              Результаты публикаций
-              <EditColor
-                editing={editing}
-                value={channel.color}
-                onChange={(color) => patch({ color })}
-                className="h-3 w-3"
-              />
-            </p>
-          </div>
-        </div>
-        <div className="shrink-0 text-right">
-          <div className="font-display text-xl font-semibold text-ink tnum">
-            <EditNumber
-              editing={editing}
-              value={channel.impressions}
-              onChange={(impressions) => patch({ impressions })}
-            >
-              {formatCompact(channel.impressions)}
-            </EditNumber>
-          </div>
-          <p className="text-[11px] text-ink-muted">показов</p>
-        </div>
-        {editing && onRemove && (
-          <RemoveButton onClick={onRemove} label={`Удалить ${channel.name}`} />
-        )}
-      </div>
-      <div className="grid grid-cols-2 gap-3 bg-paper/45 p-4">
-        <div className="rounded-xl bg-surface px-3 py-2.5">
-          <p className="text-[11px] text-ink-muted">Публикации</p>
-          <div className="mt-1 font-display text-xl font-semibold text-ink tnum">
-            <EditNumber
-              editing={editing}
-              value={channel.posts}
-              onChange={(posts) => patch({ posts })}
-            >
-              {channel.posts}
-            </EditNumber>
-          </div>
-        </div>
-        <div className="rounded-xl bg-surface px-3 py-2.5">
-          <p className="text-[11px] text-ink-muted">Средний охват</p>
-          <p className="mt-1 font-display text-xl font-semibold text-ink tnum">
-            {channel.posts
-              ? formatCompact(channel.impressions / channel.posts)
-              : '—'}
-          </p>
-        </div>
-      </div>
-      <div className="space-y-3 p-5 pt-4">
-        {channel.rows.map((row, index) => (
-          <div
-            key={row.id}
-            className={cn(
-              'grid items-center gap-3',
-              editing
-                ? 'grid-cols-[92px_1fr_110px_28px]'
-                : 'grid-cols-[92px_1fr_62px]',
-            )}
-          >
-            <span className="text-[12px] text-ink-muted">
-              Публикация {String(index + 1).padStart(2, '0')}
-            </span>
-            <span className="h-1.5 overflow-hidden rounded-full bg-ink/6">
-              <span
-                className="block h-full rounded-full"
-                style={{
-                  width: `${(row.value / max) * 100}%`,
-                  backgroundColor: channel.color,
-                }}
-              />
-            </span>
-            <span className="text-right text-[12px] font-medium text-ink tnum">
-              <EditNumber
-                editing={editing}
-                value={row.value}
-                onChange={(value) =>
-                  patch({
-                    rows: channel.rows.map((r) =>
-                      r.id === row.id ? { ...r, value } : r,
-                    ),
-                  })
-                }
-              >
-                {formatNumber(row.value)}
-              </EditNumber>
-            </span>
-            {editing && (
-              <RemoveButton
-                onClick={() =>
-                  patch({ rows: channel.rows.filter((r) => r.id !== row.id) })
-                }
-                label={`Удалить публикацию ${index + 1}`}
-              />
-            )}
-          </div>
-        ))}
-        {editing && (
-          <AddButton
-            onClick={() =>
-              patch({ rows: [...channel.rows, { id: uid('row'), value: 0 }] })
-            }
-          >
-            Добавить публикацию
-          </AddButton>
-        )}
-      </div>
-    </Card>
-  )
-}
-
-function MediaSummary({ data, editing, patch }) {
-  const { summary, socialChannels } = data
+/** Шапка вкладки: заголовок отчёта — не редактируется. */
+function MediaSummary({ data }) {
+  const { summary } = data
 
   return (
     <>
@@ -280,67 +74,20 @@ function MediaSummary({ data, editing, patch }) {
               Setanta Media Report
             </div>
             <h2 className="mt-2 font-display text-2xl font-semibold text-ink sm:text-3xl">
-              <EditText
-                editing={editing}
-                value={summary.title}
-                onChange={(title) => patch({ summary: { ...summary, title } })}
-              />
+              {summary.title}
             </h2>
           </div>
         </div>
       </section>
-
-      <div className="mt-4 grid gap-4 xl:grid-cols-2">
-        {socialChannels.map((channel) => (
-          <SocialChannelCard
-            key={channel.id}
-            channel={channel}
-            editing={editing}
-            onChange={(next) =>
-              patch({
-                socialChannels: socialChannels.map((c) =>
-                  c.id === next.id ? next : c,
-                ),
-              })
-            }
-            onRemove={() =>
-              patch({
-                socialChannels: socialChannels.filter(
-                  (c) => c.id !== channel.id,
-                ),
-              })
-            }
-          />
-        ))}
-      </div>
-      {editing && (
-        <AddButton
-          onClick={() =>
-            patch({
-              socialChannels: [
-                ...socialChannels,
-                {
-                  id: uid('sc'),
-                  name: 'Новая площадка',
-                  icon: 'Send',
-                  color: '#FFD106',
-                  posts: 1,
-                  impressions: 0,
-                  rows: [{ id: uid('row'), value: 0 }],
-                },
-              ],
-            })
-          }
-        >
-          Добавить соцсеть
-        </AddButton>
-      )}
     </>
   )
 }
 
-/** Список долей рядом с бубликом: подпись, цвет и процент. */
-function ShareList({ items, editing, onChange, itemClassName, addLabel }) {
+/**
+ * Список долей рядом с бубликом: подпись, цвет и процент. Править можно
+ * только проценты — подписи, цвета и состав групп фиксированы.
+ */
+function ShareList({ items, editing, onChange, itemClassName }) {
   return (
     <>
       {items.map((item) => (
@@ -348,27 +95,11 @@ function ShareList({ items, editing, onChange, itemClassName, addLabel }) {
           key={item.id}
           className={cn('flex items-center gap-2 text-sm', itemClassName)}
         >
-          <EditColor
-            editing={editing}
-            value={item.color}
-            onChange={(color) =>
-              onChange(
-                items.map((i) => (i.id === item.id ? { ...i, color } : i)),
-              )
-            }
-            className="h-2.5 w-2.5"
+          <span
+            className="h-2.5 w-2.5 shrink-0 rounded-full"
+            style={{ backgroundColor: item.color }}
           />
-          <span className="min-w-0 flex-1 text-ink-soft">
-            <EditText
-              editing={editing}
-              value={item.label}
-              onChange={(label) =>
-                onChange(
-                  items.map((i) => (i.id === item.id ? { ...i, label } : i)),
-                )
-              }
-            />
-          </span>
+          <span className="min-w-0 flex-1 text-ink-soft">{item.label}</span>
           <span className="w-[76px] text-right font-semibold text-ink tnum">
             <EditNumber
               editing={editing}
@@ -382,89 +113,39 @@ function ShareList({ items, editing, onChange, itemClassName, addLabel }) {
               {formatPct(item.value, 0)}
             </EditNumber>
           </span>
-          {editing && (
-            <RemoveButton
-              onClick={() => onChange(items.filter((i) => i.id !== item.id))}
-              label={`Удалить ${item.label}`}
-            />
-          )}
         </div>
       ))}
-      {editing && (
-        <AddButton
-          onClick={() =>
-            onChange([
-              ...items,
-              {
-                id: uid('share'),
-                label: 'Новая группа',
-                value: 0,
-                color: '#A7ADB4',
-              },
-            ])
-          }
-        >
-          {addLabel}
-        </AddButton>
-      )}
     </>
   )
 }
 
 function AudienceAgeReport({ data, editing, patch }) {
   const { audience, ageShare, platformDeviceShare, leagueAgeRows } = data
-  const malePct = formatPct(audience.malePct, 1)
+  // В центре бублика — самая крупная возрастная группа.
+  const topAge = [...ageShare].sort((a, b) => b.value - a.value)[0]
 
   return (
     <section className="mt-6">
-      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-muted">
-            Audience insights
-          </p>
-          <h2 className="mt-1 font-display text-2xl font-semibold text-ink">
-            Возраст целевой аудитории
-          </h2>
-          <p className="mt-1 text-sm text-ink-muted">
-            Демография зрителей Setanta Sports и распределение по лигам.
-          </p>
-        </div>
-        <div className="inline-flex w-fit items-center gap-2 rounded-xl border border-line bg-paper/70 px-3 py-2 text-[12px] font-semibold text-ink-soft">
-          <UsersRound size={16} />
-          <EditNumber
-            editing={editing}
-            value={audience.malePct}
-            onChange={(value) =>
-              patch({ audience: { ...audience, malePct: value } })
-            }
-            className="w-20"
-          >
-            {malePct}
-          </EditNumber>
-          аудитории — мужчины
-        </div>
+      <div className="mb-4">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-muted">
+          Audience insights
+        </p>
+        <h2 className="mt-1 font-display text-2xl font-semibold text-ink">
+          Возраст целевой аудитории
+        </h2>
+        <p className="mt-1 text-sm text-ink-muted">
+          Демография зрителей Setanta Sports и распределение по лигам.
+        </p>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
         <Card className="overflow-hidden">
           <div className="border-b border-line bg-paper/45 p-5">
             <h3 className="font-display text-lg font-semibold text-ink">
-              <EditText
-                editing={editing}
-                value={audience.ageTitle}
-                onChange={(ageTitle) =>
-                  patch({ audience: { ...audience, ageTitle } })
-                }
-              />
+              {audience.ageTitle}
             </h3>
             <div className="mt-1 text-[13px] text-ink-muted">
-              <EditText
-                editing={editing}
-                value={audience.ageNote}
-                onChange={(ageNote) =>
-                  patch({ audience: { ...audience, ageNote } })
-                }
-              />
+              {audience.ageNote}
             </div>
           </div>
           <div className="flex flex-col items-center gap-6 p-5 sm:flex-row sm:justify-center sm:p-6">
@@ -472,8 +153,8 @@ function AudienceAgeReport({ data, editing, patch }) {
               data={ageShare}
               size={220}
               thickness={34}
-              centerValue={malePct}
-              centerLabel="мужчины"
+              centerValue={topAge ? formatPct(topAge.value, 0) : '—'}
+              centerLabel={topAge?.label}
             />
             <div className="w-full max-w-[280px] space-y-2.5">
               <ShareList
@@ -481,7 +162,6 @@ function AudienceAgeReport({ data, editing, patch }) {
                 editing={editing}
                 onChange={(next) => patch({ ageShare: next })}
                 itemClassName="rounded-xl border border-line bg-paper/55 px-3 py-2.5"
-                addLabel="Добавить возрастную группу"
               />
             </div>
           </div>
@@ -513,19 +193,6 @@ function AudienceAgeReport({ data, editing, patch }) {
                   thickness={30}
                   centerValue={platform.platform}
                 />
-                {editing && (
-                  <EditText
-                    editing={editing}
-                    value={platform.platform}
-                    onChange={(name) =>
-                      patch({
-                        platformDeviceShare: platformDeviceShare.map((p) =>
-                          p.id === platform.id ? { ...p, platform: name } : p,
-                        ),
-                      })
-                    }
-                  />
-                )}
                 <div className="w-full space-y-2">
                   <ShareList
                     items={platform.data}
@@ -538,7 +205,6 @@ function AudienceAgeReport({ data, editing, patch }) {
                       })
                     }
                     itemClassName="text-[13px]"
-                    addLabel="Добавить экран"
                   />
                 </div>
               </div>
@@ -571,7 +237,6 @@ function AudienceAgeReport({ data, editing, patch }) {
                 <th className="px-4 py-3 text-center">25–34 y.o.</th>
                 <th className="px-4 py-3 text-center">35–44 y.o.</th>
                 <th className="px-4 py-3 text-center">45–54 y.o.</th>
-                {editing && <th className="px-3 py-3" />}
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
@@ -581,30 +246,10 @@ function AudienceAgeReport({ data, editing, patch }) {
                   className="transition-colors hover:bg-indigo-50/70"
                 >
                   <td className="px-5 py-3.5 font-semibold text-ink">
-                    <EditText
-                      editing={editing}
-                      value={row.sport}
-                      onChange={(sport) =>
-                        patch({
-                          leagueAgeRows: leagueAgeRows.map((r) =>
-                            r.id === row.id ? { ...r, sport } : r,
-                          ),
-                        })
-                      }
-                    />
+                    {row.sport}
                   </td>
                   <td className="max-w-[270px] px-5 py-3.5 text-[13px] text-ink-soft">
-                    <EditText
-                      editing={editing}
-                      value={row.leagues}
-                      onChange={(leagues) =>
-                        patch({
-                          leagueAgeRows: leagueAgeRows.map((r) =>
-                            r.id === row.id ? { ...r, leagues } : r,
-                          ),
-                        })
-                      }
-                    />
+                    {row.leagues}
                   </td>
                   {row.ages.map((value, index) => (
                     <td
@@ -635,46 +280,11 @@ function AudienceAgeReport({ data, editing, patch }) {
                       </EditNumber>
                     </td>
                   ))}
-                  {editing && (
-                    <td className="px-3 py-3.5">
-                      <RemoveButton
-                        onClick={() =>
-                          patch({
-                            leagueAgeRows: leagueAgeRows.filter(
-                              (r) => r.id !== row.id,
-                            ),
-                          })
-                        }
-                        label={`Удалить ${row.sport}`}
-                      />
-                    </td>
-                  )}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        {editing && (
-          <div className="px-5 pb-4">
-            <AddButton
-              onClick={() =>
-                patch({
-                  leagueAgeRows: [
-                    ...leagueAgeRows,
-                    {
-                      id: uid('lg'),
-                      sport: 'Новый вид спорта',
-                      leagues: '',
-                      ages: [0, 0, 0, 0],
-                    },
-                  ],
-                })
-              }
-            >
-              Добавить строку
-            </AddButton>
-          </div>
-        )}
       </Card>
     </section>
   )
@@ -714,7 +324,6 @@ function AudienceBreakdown({ data, editing, patch }) {
               items={deviceShare}
               editing={editing}
               onChange={(next) => patch({ deviceShare: next })}
-              addLabel="Добавить тип экрана"
             />
           </div>
         </div>
@@ -740,24 +349,13 @@ function AudienceBreakdown({ data, editing, patch }) {
               <tr className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted">
                 <th className="px-5 py-2.5 text-left">Город</th>
                 <th className="px-5 py-2.5 text-right">Зрители</th>
-                {editing && <th className="px-3 py-2.5" />}
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
               {cityShare.map((city) => (
                 <tr key={city.id} className="hover:bg-ink/1.5">
                   <td className="px-5 py-2.5 font-medium text-ink-soft">
-                    <EditText
-                      editing={editing}
-                      value={city.name}
-                      onChange={(name) =>
-                        patch({
-                          cityShare: cityShare.map((c) =>
-                            c.id === city.id ? { ...c, name } : c,
-                          ),
-                        })
-                      }
-                    />
+                    {city.name}
                   </td>
                   <td className="relative px-5 py-2.5 text-right">
                     {!editing && (
@@ -782,41 +380,11 @@ function AudienceBreakdown({ data, editing, patch }) {
                       </EditNumber>
                     </span>
                   </td>
-                  {editing && (
-                    <td className="px-3 py-2.5">
-                      <RemoveButton
-                        onClick={() =>
-                          patch({
-                            cityShare: cityShare.filter(
-                              (c) => c.id !== city.id,
-                            ),
-                          })
-                        }
-                        label={`Удалить ${city.name}`}
-                      />
-                    </td>
-                  )}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        {editing && (
-          <div className="px-5 pb-4 pt-1">
-            <AddButton
-              onClick={() =>
-                patch({
-                  cityShare: [
-                    ...cityShare,
-                    { id: uid('city'), name: 'Новый город', value: 0 },
-                  ],
-                })
-              }
-            >
-              Добавить город
-            </AddButton>
-          </div>
-        )}
       </Card>
     </div>
   )
@@ -1069,7 +637,7 @@ export default function Dashboard() {
             : `Сводка ${
                 isAdvertiser
                   ? 'по вашим медиаразмещениям'
-                  : 'медиаразмещений и социальных сетей'
+                  : 'медиаразмещений и аудитории'
               } за ${MONTHS_FULL[month].toLowerCase()} ${year}.`
         }
       >
@@ -1132,7 +700,7 @@ export default function Dashboard() {
 
       {tab === 'media' ? (
         <>
-          <MediaSummary data={data} editing={editing} patch={patch} />
+          <MediaSummary data={data} />
           <AudienceAgeReport data={data} editing={editing} patch={patch} />
           <AudienceBreakdown data={data} editing={editing} patch={patch} />
         </>

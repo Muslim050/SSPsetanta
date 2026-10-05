@@ -22,7 +22,8 @@ export function Sidebar({ onNavigate, collapsed = false }) {
     <aside
       className={cn(
         'flex h-full flex-col border-r border-line bg-surface py-5 transition-[width] duration-200',
-        collapsed ? 'w-[84px] px-3' : 'w-[252px] px-4',
+        // 280px — чтобы «Рекламные размещения» помещались в одну строку.
+        collapsed ? 'w-[84px] px-3' : 'w-[280px] px-4',
       )}
     >
       {/* Хедер */}

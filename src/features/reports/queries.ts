@@ -11,6 +11,7 @@ import type {
   ReportSheet,
   ReportSheetCode,
   ReportSheetInput,
+  TotalStatistics,
 } from '@/api/types'
 
 export const reportKeys = {
@@ -21,6 +22,8 @@ export const reportKeys = {
     [...reportKeys.all, 'report', contractId, period] as const,
   manual: (contractId: number, period: ReportPeriod) =>
     [...reportKeys.all, 'manual', contractId, period] as const,
+  totalStats: (contractId: number, period: ReportPeriod) =>
+    [...reportKeys.all, 'total-stats', contractId, period] as const,
   imports: (contractId: number, period: ReportPeriod) =>
     [...reportKeys.all, 'imports', contractId, period] as const,
   /** Ключ загрузки файла — по нему отчёт видит, что идёт разбор. */
@@ -93,6 +96,23 @@ export function useManualReport(
 }
 
 /**
+ * Итоги месяца для вкладки Total — считает сервер по обоим отчётам месяца.
+ * Ответ есть всегда, поэтому спрашиваем без оглядки на список месяцев.
+ */
+export function useTotalStatistics(
+  contractId: number | null | undefined,
+  period: ReportPeriod | null | undefined,
+) {
+  return useQuery({
+    queryKey: reportKeys.totalStats(contractId ?? 0, period ?? ''),
+    queryFn: (): Promise<TotalStatistics> =>
+      reportsApi.totalStatistics(contractId as number, period as ReportPeriod),
+    enabled: !!contractId && !!period,
+    retry: retryServerErrors,
+  })
+}
+
+/**
  * История загрузок файла за месяц, новые сверху. Только для площадки:
  * остальным сервер отвечает 403, а транспорт на 403 разлогинивает, — поэтому
  * включаем запрос лишь там, где его можно задать.
@@ -144,6 +164,10 @@ export function useImportReport() {
       client.invalidateQueries({
         queryKey: reportKeys.imports(report.contractId, report.period),
       })
+      // Соцсети в итогах Total — из листа нового файла.
+      client.invalidateQueries({
+        queryKey: reportKeys.totalStats(report.contractId, report.period),
+      })
     },
   })
 }
@@ -173,6 +197,10 @@ export function useSaveManualReport() {
         queryKey: reportKeys.manual(contractId, period),
       })
       client.invalidateQueries({ queryKey: reportKeys.months(contractId) })
+      // Счётчики Total считаются из ручного отчёта.
+      client.invalidateQueries({
+        queryKey: reportKeys.totalStats(contractId, period),
+      })
     },
   })
 }
@@ -208,6 +236,12 @@ export function useSaveReportSheet() {
             ),
           },
       )
+      // Соцсети в итогах Total — из листа `social`: правка меняет и их.
+      if (sheet.code === 'social') {
+        client.invalidateQueries({
+          queryKey: reportKeys.totalStats(contractId, period),
+        })
+      }
     },
     onError: (error, { contractId, period }) => {
       if ((error as { status?: number }).status === 409) {

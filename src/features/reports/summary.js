@@ -1,109 +1,22 @@
 /**
- * Сводки вкладок Statistic (Total и Spot) из отчёта за месяц.
+ * Сводки вкладок Statistic отчёта за месяц.
  *
  * Spot — записи `spots` ручного отчёта (`GET …/manual`, отдельный от
  * файлового), их заводят через `POST …/manual` — см. spotSummary.
- *
- * Total зависит от вида отчёта. Файловый — девять листов: считаем по строкам
- * так же, как сервер считает `totals` у эфиров (пустое значение — ноль).
- * Ручной — только цифры по каналам, промо и прероллы: берём их как есть.
+ * Total — готовые итоги сервера (`GET …/total-statistics`) — см. totalSummary.
  */
 
-// Выходы Live Ads в строке эфира: перед, две середины и после.
-const SPOT_KEYS = ['pre', 'mid1', 'mid2', 'post']
-
-// Каналы сводки: стандартные выходы — логи UZB TV, live — прямые эфиры;
-// `channel` — канал в ручном отчёте.
+// Каналы Spot: `channel` — канал в ручном отчёте.
 export const CHANNELS = [
-  {
-    name: 'Setanta Sports 1',
-    code: 'S1',
-    channel: 'ss1',
-    standard: 'ss1uzb',
-    live: 'live1',
-  },
-  {
-    name: 'Setanta Sports 2',
-    code: 'S2',
-    channel: 'ss2',
-    standard: 'ss2uzb',
-    live: 'live2',
-  },
+  { name: 'Setanta Sports 1', code: 'S1', channel: 'ss1' },
+  { name: 'Setanta Sports 2', code: 'S2', channel: 'ss2' },
 ]
 
 const num = (value) => Number(value) || 0
-const sumBy = (rows, pick) => rows.reduce((sum, row) => sum + pick(row), 0)
 
 /**
- * Длительность ролика из названия: «CLIENT - 30 Sec - UZB TV» → 30. В логе
- * выходов отдельного поля под неё нет, а итогов у `spot_log` сервер не
- * считает. Не нашли — null: такой ролик в секунды не попадёт.
- */
-const durationOf = (item) => {
-  const match = String(item ?? '').match(/(\d+)\s*sec/i)
-  return match ? Number(match[1]) : null
-}
-
-/** Total из девяти листов файлового отчёта. */
-function fileSummary(sheets) {
-  const rowsOf = (code) =>
-    sheets.find((sheet) => sheet.code === code)?.rows ?? []
-
-  const channels = CHANNELS.map(({ name, code, channel, standard, live }) => {
-    const spots = rowsOf(standard)
-    const durations = spots.map((row) => durationOf(row.item))
-    const events = rowsOf(live)
-    return {
-      name,
-      code,
-      channel,
-      standardSpots: spots.length,
-      standardSeconds: sumBy(durations, (seconds) => seconds ?? 0),
-      // Сколько роликов осталось без длительности — об этом говорим рядом
-      // с секундами, чтобы недосчёт не выглядел точной цифрой.
-      unknownDuration: durations.filter((seconds) => seconds === null).length,
-      liveEvents: events.length,
-      liveAds: sumBy(
-        events,
-        (row) => SPOT_KEYS.filter((key) => num(row[key]) > 0).length,
-      ),
-      liveSeconds: sumBy(events, (row) =>
-        SPOT_KEYS.reduce((sum, key) => sum + num(row[key]), 0),
-      ),
-      liveViews: sumBy(events, (row) => num(row.views)),
-    }
-  })
-
-  const total = (key) => sumBy(channels, (channel) => channel[key])
-  const eventPromo = rowsOf('promo1').length + rowsOf('promo2').length
-  const social = rowsOf('social')
-  const network = (id) => {
-    const rows = social.filter((row) => row.network === id)
-    return {
-      posts: rows.length,
-      impressions: sumBy(rows, (row) => num(row.impressions)),
-    }
-  }
-
-  return {
-    manual: false,
-    totals: {
-      liveEvents: total('liveEvents'),
-      eventPromo,
-      seconds: total('standardSeconds') + total('liveSeconds'),
-      views: total('liveViews'),
-    },
-    social: {
-      instagram: network('instagram'),
-      telegram: network('telegram'),
-    },
-    unknownDuration: total('unknownDuration'),
-  }
-}
-
-/**
- * Цифры вкладки Spot — записи `spots` отчёта, по каналу на запись. Пустые
- * `spots` — цифры за месяц не заведены: null.
+ * Цифры вкладки Spot — записи `spots` ручного отчёта, по каналу на запись.
+ * Пустые `spots` — цифры за месяц не заведены: null.
  */
 export function spotSummary(report) {
   const spots = report?.spots ?? []
@@ -131,32 +44,24 @@ export function spotSummary(report) {
 }
 
 /**
- * Total ручного отчёта — из тех же записей `spots`. Числа эфиров и соцсетей
- * в нём нет — они null, и Total показывает на их месте прочерк.
+ * Итоги вкладки Total из ответа `total-statistics`: счётчики как есть
+ * (`null` — ручного отчёта нет, на карточке прочерк) и соцсети по сети.
  */
-function manualSummary(report) {
-  const channels = spotSummary(report)?.channels ?? []
-  const total = (key) => sumBy(channels, (channel) => channel[key])
-  const eventPromo = report.eventPromoCount ?? null
-
+export function totalSummary(data) {
+  const byNetwork = Object.fromEntries(
+    (data?.socials ?? []).map((item) => [
+      item.network,
+      { posts: num(item.posts), impressions: num(item.impressions) },
+    ]),
+  )
+  const empty = { posts: 0, impressions: 0 }
   return {
-    manual: true,
-    totals: {
-      liveEvents: null,
-      eventPromo,
-      seconds: total('standardSeconds') + total('liveSeconds'),
-      views: total('liveViews'),
+    totals: data?.totals ?? {},
+    social: {
+      instagram: byNetwork.instagram ?? empty,
+      telegram: byNetwork.telegram ?? empty,
     },
-    social: null,
-    unknownDuration: 0,
   }
-}
-
-/** Сводка Total — из отчёта за период: файлового или ручного. */
-export function reportSummary(report) {
-  return report.reportType === 'manual'
-    ? manualSummary(report)
-    : fileSummary(report.sheets ?? [])
 }
 
 /**

@@ -495,6 +495,33 @@ export interface Report {
   lastImport: ReportImport | null
 }
 
+/**
+ * Итоговая статистика месяца — вкладка Total. `totals` — из ручного отчёта
+ * (нет его — все `null`), `socials` — из листа `social` файлового (нет
+ * файла — нули). Ответ всегда есть, даже без отчётов.
+ */
+export interface StatisticsTotals {
+  /** Выходы рекламы в прямых эфирах, SS1 + SS2. */
+  liveCount: number | null
+  eventPromoCount: number | null
+  /** Секунды обычных выходов и рекламы в эфирах, SS1 + SS2. */
+  totalSeconds: number | null
+  /** Просмотры рекламы в прямых эфирах, SS1 + SS2. */
+  liveViews: number | null
+}
+
+export interface SocialStatistics {
+  network: SocialNetwork
+  posts: number
+  impressions: number
+}
+
+export interface TotalStatistics {
+  totals: StatisticsTotals
+  /** Всегда обе сети: instagram и telegram. */
+  socials: SocialStatistics[]
+}
+
 /** Месяц, за который отчёт загружен. */
 export interface ReportMonth {
   period: ReportPeriod

@@ -18,8 +18,9 @@ import {
   useReportImports,
   useReportMonths,
   useManualReport,
+  useTotalStatistics,
 } from '@/features/reports/queries'
-import { reportSummary, spotSummary } from '@/features/reports/summary'
+import { spotSummary, totalSummary } from '@/features/reports/summary'
 import { fileHref } from '@/features/files/download'
 import { useToast } from '@/components/ui/Toast.jsx'
 import { useConfirm } from '@/components/ui/Confirm.jsx'
@@ -620,12 +621,14 @@ export function MediaReport({
   // сервер отвечает 404. Только что загруженный отчёт уже лежит в кэше.
   const report = useReport(contractId, period, { enabled: inList })
   const sheets = report.data?.sheets ?? []
-  // Сводки Statistic: null — за месяц отчёта нет (или он ещё грузится).
+  // Итоги Total считает сервер по обоим отчётам месяца (`GET …/total-statistics`).
+  const totalStats = useTotalStatistics(contractId, period)
   const summary = useMemo(
-    () => (report.data ? reportSummary(report.data) : null),
-    [report.data],
+    () => (totalStats.data ? totalSummary(totalStats.data) : null),
+    [totalStats.data],
   )
-  const summaryLoading = report.isPending && report.fetchStatus !== 'idle'
+  const summaryLoading =
+    totalStats.isPending && totalStats.fetchStatus !== 'idle'
   // Цифры Spot — отдельный ручной отчёт месяца (`GET …/manual`).
   const manual = useManualReport(contractId, period)
   const spot = useMemo(() => spotSummary(manual.data), [manual.data])
@@ -703,6 +706,7 @@ export function MediaReport({
                 <TotalStatisticsReport
                   summary={summary}
                   loading={summaryLoading}
+                  error={totalStats.isError}
                 />
               ) : tab === 'channels' ? (
                 <ChannelSummaryReport

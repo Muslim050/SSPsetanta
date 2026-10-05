@@ -3,22 +3,15 @@ import {
   Megaphone,
   Building2,
   Radio,
-  LineChart,
   FileText,
 } from 'lucide-react'
 
 export const NAV = [
   {
     to: '/app/campaigns',
-    label: 'Кампании',
+    label: 'Рекламные размещения',
     icon: Megaphone,
     roles: ['admin', 'viewer', 'advertiser'],
-  },
-  {
-    to: '/app/agreements',
-    label: 'Договоры',
-    icon: FileText,
-    roles: ['advertiser', 'admin'],
   },
   {
     to: '/app/overview',
@@ -27,10 +20,22 @@ export const NAV = [
     roles: ['admin', 'viewer'],
   },
   {
+    to: '/app/reports',
+    label: 'Статистика',
+    icon: LayoutDashboard,
+    roles: ['advertiser'],
+  },
+  {
     to: '/app/contracts',
-    label: 'Contract Overview',
+    label: 'Статус оплаты',
     icon: FileText,
     roles: ['admin', 'viewer'],
+  },
+  {
+    to: '/app/agreements',
+    label: 'Договоры',
+    icon: FileText,
+    roles: ['advertiser', 'admin'],
   },
   {
     to: '/app/advertisers',
@@ -44,11 +49,5 @@ export const NAV = [
     icon: Radio,
     roles: ['admin', 'viewer', 'advertiser'],
     hidden: true,
-  },
-  {
-    to: '/app/reports',
-    label: 'Статистика',
-    icon: LineChart,
-    roles: ['advertiser'],
   },
 ]
