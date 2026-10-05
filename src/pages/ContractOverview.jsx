@@ -59,6 +59,29 @@ import { advertiserLogo } from '@/features/advertisers/logo'
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => i)
 
+// На «Статусе оплаты» статус «Ожидает оплату» подписан «В процессе» —
+// в кампаниях подпись прежняя.
+const PAYMENT_LABELS = {
+  awaiting: 'В процессе',
+  paid: CONTRACT_PAYMENT.paid.label,
+}
+// «В процессе» здесь оранжевый, а не красный.
+const PAYMENT_BADGES = {
+  awaiting: 'bg-warning/20 text-warning',
+  paid: CONTRACT_PAYMENT.paid.badge,
+}
+const STATUS_OPTIONS = PAYMENT_OPTIONS.map((option) => ({
+  ...option,
+  label: PAYMENT_LABELS[option.value],
+  badge: PAYMENT_BADGES[option.value],
+  dot: option.value === 'paid' ? 'bg-success' : 'bg-warning',
+}))
+// Подсказки и цвет вкладок месяцев.
+const MONTH_STATUS_TITLES = { paid: 'оплачен', awaiting: 'в процессе' }
+const MONTH_STATUS_FILLS = {
+  awaiting: 'bg-warning/25 font-semibold text-warning hover:bg-warning/35',
+}
+
 /** Границы месяца в ISO — с ними и сравниваем срок договора. */
 function monthBounds(year, month) {
   const mm = String(month + 1).padStart(2, '0')
@@ -317,7 +340,7 @@ export default function ContractOverview() {
           toast.success(
             `Договор ${contract.number}, ${MONTHS_FULL[
               Number(statusMonth) - 1
-            ].toLowerCase()} ${statusYear}: ${CONTRACT_PAYMENT[next].label}`,
+            ].toLowerCase()} ${statusYear}: ${PAYMENT_LABELS[next]}`,
           )
         },
         onError: (err) =>
@@ -447,6 +470,8 @@ export default function ContractOverview() {
           onChange={setMonth}
           counts={monthCounts}
           statuses={monthStatuses}
+          statusTitles={MONTH_STATUS_TITLES}
+          statusFills={MONTH_STATUS_FILLS}
         />
       </div>
 
@@ -653,11 +678,13 @@ export default function ContractOverview() {
           anchorEl={paymentAnchor.el}
           title={`Договор ${paymentRow.contract.number}`}
           value={statusAt(paymentRow.contract, activePeriod) ?? 'awaiting'}
-          options={PAYMENT_OPTIONS}
+          options={STATUS_OPTIONS}
           history={paymentRow.contract.paymentLog ?? []}
           statusByPeriod={paymentRow.contract.paymentStatusByPeriod ?? {}}
           period={activePeriod ?? periodKey(activeYear, new Date().getMonth())}
           years={years}
+          // Месяц выбран вкладкой — в поповере меняется только число.
+          monthLocked={activePeriod != null}
           readOnly={!canEditMoney}
           onSave={savePaymentStatus}
           onClose={() => setPaymentAnchor(null)}
@@ -784,11 +811,10 @@ function MoneyCell({ budget, spent, pacing, editable, onOpen }) {
  */
 function PaymentPill({ status, editable, onOpen }) {
   const tone = paymentTone(status)
-  const meta = tone ? CONTRACT_PAYMENT[tone] : null
-  const label = meta?.label ?? 'Нет отметки'
+  const label = tone ? PAYMENT_LABELS[tone] : 'Нет отметки'
   const shell = cn(
     'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[12px] font-semibold',
-    meta ? meta.badge : 'bg-ink/6 text-ink-muted',
+    tone ? PAYMENT_BADGES[tone] : 'bg-ink/6 text-ink-muted',
   )
 
   if (!editable) return <span className={shell}>{label}</span>

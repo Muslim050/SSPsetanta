@@ -36,6 +36,65 @@ const moveToMonth = (value, year, month) => {
 /** Ключ месяца: 2026-08. Им же статус привязан к вкладке месяца. */
 export const periodKey = (year, month) => `${year}-${pad(month + 1)}`
 
+// Дни недели календаря — с понедельника.
+const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
+
+/**
+ * Дни одного месяца — для даты смены, когда месяц уже выбран вкладкой на
+ * странице: меняется только число. Будущие дни недоступны — смена статуса
+ * не бывает завтрашней.
+ */
+function MonthDays({ year, month, value, onPick }) {
+  const selected = new Date(value)
+  const days = new Date(year, month + 1, 0).getDate()
+  // Сколько пустых клеток до 1-го числа: неделя начинается с понедельника.
+  const offset = (new Date(year, month, 1).getDay() + 6) % 7
+  const today = new Date()
+  today.setHours(23, 59, 59, 999)
+
+  return (
+    <div>
+      <div className="grid grid-cols-7 gap-0.5 text-center text-[10px] font-medium uppercase text-ink-muted">
+        {WEEKDAYS.map((day) => (
+          <span key={day} className="py-1">
+            {day}
+          </span>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-0.5">
+        {Array.from({ length: offset }, (_, index) => (
+          <span key={`empty-${index}`} />
+        ))}
+        {Array.from({ length: days }, (_, index) => {
+          const day = index + 1
+          const active =
+            selected.getFullYear() === year &&
+            selected.getMonth() === month &&
+            selected.getDate() === day
+          return (
+            <button
+              key={day}
+              type="button"
+              disabled={new Date(year, month, day) > today}
+              onClick={() => onPick(day)}
+              aria-pressed={active}
+              title={`${day} ${MONTHS_FULL[month].toLowerCase()} ${year}`}
+              className={cn(
+                'h-8 rounded-lg text-[12px] font-medium transition-colors focus-ring tnum disabled:cursor-default disabled:text-ink-muted/40',
+                active
+                  ? 'bg-indigo-500 font-semibold text-ink'
+                  : 'text-ink-soft enabled:hover:bg-ink/5 enabled:hover:text-ink',
+              )}
+            >
+              {day}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 const parsePeriod = (period) => {
   const [year, month] = String(period ?? '').split('-')
   return Number.isFinite(Number(year)) && Number.isFinite(Number(month))
@@ -48,9 +107,11 @@ const parsePeriod = (period) => {
  * выбираем вариант, месяц и дату смены. Вторая вкладка — история смен.
  * Рисуется порталом с position: fixed — иначе карточка его обрежет.
  *
- * options: [{ value, label, badge? }]
+ * options: [{ value, label, badge?, dot? }] — dot: цвет точки у месяца
  * history: [{ id, status, period, changedAt, by }]
  * statusByPeriod: { '2026-08': { status, changedAt } } — раскраска месяцев
+ * monthLocked — месяц уже выбран вкладкой на странице: выбора месяца в
+ *   поповере нет, а дата смены — число этого месяца.
  */
 export function StatusPopover({
   anchorEl,
@@ -61,6 +122,7 @@ export function StatusPopover({
   statusByPeriod = {},
   period,
   years,
+  monthLocked = false,
   readOnly = false,
   onSave,
   onClose,
@@ -70,13 +132,18 @@ export function StatusPopover({
   // Кто не меняет статус, открывает карточку ради истории.
   const [tab, setTab] = useState(readOnly ? 'history' : 'status')
   const [draft, setDraft] = useState(value)
-  // Смену можно оформить задним числом — дату и время выбирает пользователь.
-  const [changedAt, setChangedAt] = useState(() => toDateTimeInput(new Date()))
   // Месяц, к которому относится статус: по умолчанию выбранный в фильтре.
   const initial = parsePeriod(period) ?? {
     year: new Date().getFullYear(),
     month: new Date().getMonth(),
   }
+  // Смену можно оформить задним числом — дату и время выбирает пользователь.
+  // Месяц закреплён вкладкой — сегодняшнее число, но в этом месяце.
+  const [changedAt, setChangedAt] = useState(() =>
+    monthLocked
+      ? moveToMonth(null, initial.year, initial.month)
+      : toDateTimeInput(new Date()),
+  )
   const [year, setYear] = useState(initial.year)
   const [month, setMonth] = useState(initial.month)
 
@@ -86,6 +153,13 @@ export function StatusPopover({
     setYear(nextYear)
     setMonth(nextMonth)
     setChangedAt((current) => moveToMonth(current, nextYear, nextMonth))
+  }
+
+  /** Число в закреплённом месяце; время смены остаётся прежним. */
+  const pickDay = (day) => {
+    const date = new Date(changedAt)
+    date.setFullYear(year, month, day)
+    setChangedAt(toDateTimeInput(date))
   }
 
   const pickChangedAt = (localValue) => {
@@ -250,84 +324,106 @@ export function StatusPopover({
             })}
           </div>
 
-          <div className="mt-3">
-            <Field label="Дата изменения">
-              <Input
-                type="datetime-local"
+          {monthLocked ? (
+            <div className="mt-3">
+              <p className="mb-1.5 text-[13px] font-medium text-ink-soft">
+                Дата изменения
+              </p>
+              <MonthDays
+                year={year}
+                month={month}
                 value={changedAt}
-                onChange={(e) => pickChangedAt(e.target.value)}
-                className="h-9 text-[13px] tnum"
+                onPick={pickDay}
               />
-            </Field>
-          </div>
-
-          {/* Месяц договора, к которому относится статус: его вкладка в
-              фильтре окрасится зелёным или красным. */}
-          <div className="mt-3">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-[13px] font-medium text-ink-soft">Месяц</p>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  disabled={prevYear == null}
-                  onClick={() => pickMonth(prevYear, month)}
-                  aria-label="Предыдущий год"
-                  className={arrowClass}
-                >
-                  <ChevronLeft size={14} />
-                </button>
-                <span className="min-w-[38px] text-center text-[12px] font-semibold text-ink tnum">
-                  {year}
-                </span>
-                <button
-                  type="button"
-                  disabled={nextYear == null}
-                  onClick={() => pickMonth(nextYear, month)}
-                  aria-label="Следующий год"
-                  className={arrowClass}
-                >
-                  <ChevronRight size={14} />
-                </button>
+              <p className="mt-1.5 text-[11px] text-ink-muted">
+                {periodStatus
+                  ? `${MONTHS_FULL[month]} ${year}: ${byValue[periodStatus]?.label ?? periodStatus}`
+                  : `${MONTHS_FULL[month]} ${year}: статус не ставили`}
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="mt-3">
+                <Field label="Дата изменения">
+                  <Input
+                    type="datetime-local"
+                    value={changedAt}
+                    onChange={(e) => pickChangedAt(e.target.value)}
+                    className="h-9 text-[13px] tnum"
+                  />
+                </Field>
               </div>
-            </div>
 
-            <div className="mt-1.5 grid grid-cols-4 gap-1">
-              {MONTHS_SHORT.map((label, index) => {
-                const active = index === month
-                // У месяца уже есть статус — показываем точкой, какой именно.
-                const saved = statusByPeriod[periodKey(year, index)]?.status
-                return (
-                  <button
-                    key={label}
-                    type="button"
-                    onClick={() => pickMonth(year, index)}
-                    title={`${MONTHS_FULL[index]} ${year}`}
-                    className={cn(
-                      'flex items-center justify-center gap-1 rounded-lg border px-1 py-1.5 text-[12px] font-medium transition-colors focus-ring',
-                      active
-                        ? 'border-indigo-400 bg-indigo-50 text-ink'
-                        : 'border-line bg-surface text-ink-soft hover:border-indigo-200 hover:bg-indigo-50/50',
-                    )}
-                  >
-                    {label}
-                    {saved && (
-                      <span
+              {/* Месяц договора, к которому относится статус: его вкладка в
+                фильтре окрасится зелёным или красным. */}
+              <div className="mt-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[13px] font-medium text-ink-soft">Месяц</p>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      disabled={prevYear == null}
+                      onClick={() => pickMonth(prevYear, month)}
+                      aria-label="Предыдущий год"
+                      className={arrowClass}
+                    >
+                      <ChevronLeft size={14} />
+                    </button>
+                    <span className="min-w-[38px] text-center text-[12px] font-semibold text-ink tnum">
+                      {year}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={nextYear == null}
+                      onClick={() => pickMonth(nextYear, month)}
+                      aria-label="Следующий год"
+                      className={arrowClass}
+                    >
+                      <ChevronRight size={14} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-1.5 grid grid-cols-4 gap-1">
+                  {MONTHS_SHORT.map((label, index) => {
+                    const active = index === month
+                    // У месяца уже есть статус — показываем точкой, какой именно.
+                    const saved = statusByPeriod[periodKey(year, index)]?.status
+                    return (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={() => pickMonth(year, index)}
+                        title={`${MONTHS_FULL[index]} ${year}`}
                         className={cn(
-                          'h-1.5 w-1.5 shrink-0 rounded-full',
-                          saved === 'paid' ? 'bg-success' : 'bg-danger',
+                          'flex items-center justify-center gap-1 rounded-lg border px-1 py-1.5 text-[12px] font-medium transition-colors focus-ring',
+                          active
+                            ? 'border-indigo-400 bg-indigo-50 text-ink'
+                            : 'border-line bg-surface text-ink-soft hover:border-indigo-200 hover:bg-indigo-50/50',
                         )}
-                      />
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-            <p className="mt-1.5 text-[11px] text-ink-muted">
-              {periodStatus
-                ? `${MONTHS_FULL[month]} ${year}: ${byValue[periodStatus]?.label ?? periodStatus}`
-                : `${MONTHS_FULL[month]} ${year}: статус не ставили`}
-            </p>
-          </div>
+                      >
+                        {label}
+                        {saved && (
+                          <span
+                            className={cn(
+                              'h-1.5 w-1.5 shrink-0 rounded-full',
+                              byValue[saved]?.dot ??
+                                (saved === 'paid' ? 'bg-success' : 'bg-danger'),
+                            )}
+                          />
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+                <p className="mt-1.5 text-[11px] text-ink-muted">
+                  {periodStatus
+                    ? `${MONTHS_FULL[month]} ${year}: ${byValue[periodStatus]?.label ?? periodStatus}`
+                    : `${MONTHS_FULL[month]} ${year}: статус не ставили`}
+                </p>
+              </div>
+            </>
+          )}
 
           <div className="mt-4 flex gap-2">
             <Button
