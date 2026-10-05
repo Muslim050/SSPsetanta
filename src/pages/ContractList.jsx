@@ -14,10 +14,20 @@ import { Loader } from '@/components/ui/Loader.jsx'
 import { FadeIn } from '@/components/ui/FadeIn.jsx'
 import { ContractPreviewModal } from '@/components/campaigns/ContractPreviewModal.jsx'
 import { BrandTabs } from '@/components/campaigns/BrandTabs.jsx'
+import { SegmentTabs } from '@/components/ui/Tabs.jsx'
 import { CONTRACT_STATUS, PACKAGES, leagueLabel } from '@/lib/metrics.js'
 import { formatDate } from '@/lib/format.js'
 
 const ALL_BRANDS = 'all'
+const ALL_STATUSES = 'all'
+
+// Табы статусов договора — в порядке жизни договора.
+const STATUS_TABS = [
+  { value: ALL_STATUSES, label: 'Все' },
+  { value: 'active', label: 'Активные' },
+  { value: 'completed', label: 'Завершённые' },
+  { value: 'terminated', label: 'Расторгнутые' },
+]
 
 /** Срок договора одной строкой: «01.01.2026 — 31.12.2026». */
 const term = (contract) =>
@@ -65,6 +75,7 @@ export default function ContractList() {
   // Открытый в окне договор вместе с брендом: null — окно закрыто.
   const [opened, setOpened] = useState(null)
   const [brandId, setBrandId] = useState(ALL_BRANDS)
+  const [status, setStatus] = useState(ALL_STATUSES)
 
   // Вкладки рекламодателей — площадке, у которой брендов много. Только
   // бренды с договорами; счётчики — договоры и сколько из них активны.
@@ -98,10 +109,29 @@ export default function ContractList() {
   const activeBrand = brands.some((brand) => brand.id === brandId)
     ? brandId
     : ALL_BRANDS
-  const shownItems =
+  const brandItems =
     activeBrand === ALL_BRANDS
       ? items
       : items.filter((item) => item.advertiser.id === activeBrand)
+
+  // Табы статусов — как у рекламных размещений: счётчики внутри выбранного
+  // бренда, пустые статусы не показываем — «Все» остаётся всегда.
+  const statusItems = STATUS_TABS.map((tab) => ({
+    ...tab,
+    count:
+      tab.value === ALL_STATUSES
+        ? brandItems.length
+        : brandItems.filter((item) => item.contract.status === tab.value)
+            .length,
+  })).filter((tab) => tab.value === ALL_STATUSES || tab.count > 0)
+  // Выбранный статус мог опустеть после смены бренда — тогда «Все».
+  const activeStatus = statusItems.some((tab) => tab.value === status)
+    ? status
+    : ALL_STATUSES
+  const shownItems =
+    activeStatus === ALL_STATUSES
+      ? brandItems
+      : brandItems.filter((item) => item.contract.status === activeStatus)
 
   if (isPending) return <Loader label="Загружаем договоры…" />
 
@@ -122,12 +152,21 @@ export default function ContractList() {
         </Card>
       ) : (
         <>
+          {/* Сначала бренд, под ним — статус договора внутри бренда. */}
           {brands.length > 2 && (
             <BrandTabs
               items={brands}
               value={activeBrand}
               onChange={setBrandId}
               noun="договоров"
+              className="mb-3"
+            />
+          )}
+          {items.length > 0 && (
+            <SegmentTabs
+              items={statusItems}
+              value={activeStatus}
+              onChange={setStatus}
               className="mb-4"
             />
           )}

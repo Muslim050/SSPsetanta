@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/Button'
 import { Field, Input } from '@/components/ui/Field'
 import { cn } from '@/lib/cn.js'
+import { usePopoverPlacement } from '@/lib/usePopoverPlacement.js'
 
 const WIDTH = 300
 
@@ -154,6 +155,8 @@ export function MoneyPopover({
     setIncome('')
   }
 
+  // Под ячейкой, а если не помещается — над ней; всегда в пределах экрана.
+  const placement = usePopoverPlacement(ref, anchor)
   // Прижимаем к правому краю ячейки, но не даём уехать за экран.
   const left = Math.min(
     Math.max(12, anchor.right - WIDTH),
@@ -171,8 +174,13 @@ export function MoneyPopover({
   return createPortal(
     <div
       ref={ref}
-      style={{ left, top: anchor.bottom + 8, width: WIDTH }}
-      className="fixed z-50 rounded-2xl border border-line bg-surface p-4 shadow-lift"
+      style={{
+        left,
+        top: placement.top,
+        width: WIDTH,
+        maxHeight: placement.maxHeight,
+      }}
+      className="fixed z-50 overflow-y-auto rounded-2xl border border-line bg-surface p-4 shadow-lift"
       onKeyDown={(e) => e.key === 'Enter' && save()}
     >
       <div className="flex items-start justify-between gap-3">

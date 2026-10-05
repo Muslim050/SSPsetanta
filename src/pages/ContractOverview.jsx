@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   CalendarCheck,
@@ -44,6 +44,7 @@ import { EmptyState } from '@/components/ui/EmptyState.jsx'
 import { Loader } from '@/components/ui/Loader.jsx'
 import { FadeIn } from '@/components/ui/FadeIn.jsx'
 import { Progress } from '@/components/ui/Progress.jsx'
+import { AnchoredPopover } from '@/components/ui/AnchoredPopover.jsx'
 import { ContractPreviewModal } from '@/components/campaigns/ContractPreviewModal.jsx'
 import { MoneyPopover } from '@/components/campaigns/MoneyPopover.jsx'
 import { MonthTabs, MONTHS_FULL } from '@/components/campaigns/MonthTabs.jsx'
@@ -204,17 +205,12 @@ export default function ContractOverview() {
     .sort((a, b) => (a.paidAt < b.paidAt ? 1 : -1))
 
   // Суммы ведутся по договорам — здесь складываем их по всем видимым.
-  // Месяц закрыт по договору — значит он оплачен полностью: показываем 100%
-  // и нулевой остаток, даже если в самой записи освоено меньше.
-  const spentOf = (contract) =>
-    activePeriod && statusAt(contract, activePeriod) === 'paid'
-      ? toNumber(contract.budget)
-      : toNumber(contract.spent)
-
+  // «Оплачено» — всегда сумма `spent` с сервера: статус месяца («Оплачено»)
+  // её не подменяет, иначе договор на 4 из 5 млн выглядел бы закрытым на 100%.
   const money = scoped.reduce(
     (acc, { contract }) => ({
       budget: acc.budget + toNumber(contract.budget),
-      spent: acc.spent + spentOf(contract),
+      spent: acc.spent + toNumber(contract.spent),
     }),
     { budget: 0, spent: 0 },
   )
@@ -491,7 +487,7 @@ export default function ContractOverview() {
             <tbody>
               {filtered.map(({ contract, advertiser }, i) => {
                 const budget = toNumber(contract.budget)
-                const spent = spentOf(contract)
+                const spent = toNumber(contract.spent)
                 const pacing = budget ? (spent / budget) * 100 : 0
                 // Остаток — сколько по договору ещё не закрыто деньгами.
                 const rest = budget - spent
@@ -667,27 +663,24 @@ const DOTS = {
   danger: 'bg-danger',
 }
 
-/** Карандаш в строке: меняет только статус договора. */
+/**
+ * Карандаш в строке: меняет только статус договора. Меню — AnchoredPopover:
+ * таблица его не обрежет, у нижних строк оно откроется вверх.
+ */
 function StatusMenu({ contract, value, onPick }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef(null)
-
-  useEffect(() => {
-    const h = (e) =>
-      ref.current && !ref.current.contains(e.target) && setOpen(false)
-    document.addEventListener('mousedown', h)
-    return () => document.removeEventListener('mousedown', h)
-  }, [])
+  // Кнопка, от которой открыто меню; null — меню закрыто.
+  const [anchorEl, setAnchorEl] = useState(null)
+  const open = !!anchorEl
 
   return (
-    <span className="relative" ref={ref}>
+    <span className="relative">
       <Button
         variant="secondary"
         size="sm"
         className={`h-9 w-9 shrink-0 px-0 hover:border-indigo-400 hover:bg-indigo-100 hover:text-ink ${
           open ? 'border-indigo-400 bg-indigo-100' : ''
         }`}
-        onClick={() => setOpen((v) => !v)}
+        onClick={(e) => setAnchorEl(open ? null : e.currentTarget)}
         aria-label={`Изменить статус договора ${contract.number}`}
         title="Изменить статус"
       >
@@ -695,13 +688,18 @@ function StatusMenu({ contract, value, onPick }) {
       </Button>
 
       {open && (
-        <span className="absolute right-0 top-full z-20 mt-1 flex w-48 flex-col overflow-hidden rounded-xl border border-line bg-surface p-1.5 text-left shadow-lift">
+        <AnchoredPopover
+          anchorEl={anchorEl}
+          onClose={() => setAnchorEl(null)}
+          align="right"
+          width={192}
+        >
           {Object.entries(CONTRACT_STATUS).map(([key, meta]) => (
             <button
               key={key}
               type="button"
               onClick={() => {
-                setOpen(false)
+                setAnchorEl(null)
                 onPick(key)
               }}
               className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors ${
@@ -719,7 +717,7 @@ function StatusMenu({ contract, value, onPick }) {
               )}
             </button>
           ))}
-        </span>
+        </AnchoredPopover>
       )}
     </span>
   )

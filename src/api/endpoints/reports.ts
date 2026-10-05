@@ -10,6 +10,7 @@ import type {
   ReportSheet,
   ReportSheetCode,
   ReportSheetInput,
+  TotalStatistics,
 } from '../types'
 
 /**
@@ -49,6 +50,20 @@ export function importFile(
     method: 'POST',
     body: form,
   })
+}
+
+/**
+ * GET /contracts/:id/reports/:period/total-statistics — итоги месяца для
+ * вкладки Total: счётчики из ручного отчёта и соцсети из файлового. Всегда
+ * 200, даже если за месяц нет ни одного отчёта.
+ */
+export function totalStatistics(
+  contractId: number,
+  period: ReportPeriod,
+): Promise<TotalStatistics> {
+  return request<TotalStatistics>(
+    `${base(contractId)}/${period}/total-statistics`,
+  )
 }
 
 /**
