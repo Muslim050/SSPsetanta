@@ -2,7 +2,7 @@
  * Демо-цифры страницы «Статистика» рекламодателя. Итогов за произвольный
  * период сервер не отдаёт — total-statistics считается по договору за
  * месяц, — поэтому страница пока на моках: цифры ведутся по месяцам, а
- * период «от и до» собирается из них.
+ * период «от и до» (тоже по месяцам) складывается из них.
  */
 
 // «Средний» месяц: от него считаются цифры каждого месяца.
@@ -18,14 +18,11 @@ const BASE_SOCIAL = {
   telegram: { posts: 7, impressions: 307000 },
 }
 
-/** 'YYYY-MM-DD' → номер месяца от нуля года и день; без часовых поясов. */
-function parseDate(value) {
-  const [year, month, day] = value.split('-').map(Number)
-  return { index: year * 12 + month - 1, day }
+/** 'YYYY-MM' → номер месяца от нуля года: так месяцы удобно перебирать. */
+function toIndex(period) {
+  const [year, month] = period.split('-').map(Number)
+  return year * 12 + month - 1
 }
-
-const daysIn = (index) =>
-  new Date(Math.floor(index / 12), (index % 12) + 1, 0).getDate()
 
 /**
  * Доля «среднего» месяца — 0.75–1.24, у каждого месяца своя и постоянная:
@@ -52,25 +49,20 @@ function emptySummary() {
 }
 
 /**
- * Сводка за период — в той же форме, что totalSummary: { totals, social }.
- * Месяц, захваченный частично, входит долей своих дней. Период пустой,
- * перевёрнутый или целиком в будущем — значения null.
+ * Сводка за период по месяцам ('YYYY-MM', оба включительно) — в той же
+ * форме, что totalSummary: { totals, social }. Период пустой, перевёрнутый
+ * или целиком в будущем — значения null.
  */
 export function mockRangeSummary(from, to) {
   if (!from || !to || from > to) return emptySummary()
 
-  const start = parseDate(from)
-  const end = parseDate(to)
   // Сколько «средних» месяцев в периоде.
   let weight = 0
   let hasData = false
-  for (let index = start.index; index <= end.index; index += 1) {
+  for (let index = toIndex(from); index <= toIndex(to); index += 1) {
     const factor = monthFactor(index)
     if (factor == null) continue
-    const days = daysIn(index)
-    const first = index === start.index ? start.day : 1
-    const last = index === end.index ? end.day : days
-    weight += (factor * (last - first + 1)) / days
+    weight += factor
     hasData = true
   }
   if (!hasData) return emptySummary()

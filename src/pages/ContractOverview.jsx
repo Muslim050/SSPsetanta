@@ -8,6 +8,7 @@ import {
   FileText,
   FolderOpen,
   Pencil,
+  Plus,
   Search,
 } from 'lucide-react'
 import { useAuth } from '@/features/auth/useAuth'
@@ -46,6 +47,7 @@ import { FadeIn } from '@/components/ui/FadeIn.jsx'
 import { Progress } from '@/components/ui/Progress.jsx'
 import { AnchoredPopover } from '@/components/ui/AnchoredPopover.jsx'
 import { ContractPreviewModal } from '@/components/campaigns/ContractPreviewModal.jsx'
+import { PaymentForm } from '@/components/forms/PaymentForm.jsx'
 import { MoneyPopover } from '@/components/campaigns/MoneyPopover.jsx'
 import { MonthTabs, MONTHS_FULL } from '@/components/campaigns/MonthTabs.jsx'
 import {
@@ -130,6 +132,8 @@ export default function ContractOverview() {
   // обновляться сразу после сохранения.
   const [moneyAnchor, setMoneyAnchor] = useState(null)
   const [paymentAnchor, setPaymentAnchor] = useState(null)
+  // Окно «Создать оплату».
+  const [creating, setCreating] = useState(false)
 
   // Рекламодатель видит только свои договоры, площадка — все.
   const rows = isAdvertiser
@@ -424,6 +428,13 @@ export default function ContractOverview() {
             className="h-11 w-full rounded-xl border border-line bg-surface pl-10 pr-3.5 text-sm text-ink placeholder:text-ink-muted focus-ring focus-visible:border-indigo-300"
           />
         </div>
+        {/* Заводит площадка; наблюдателю кнопки нет. */}
+        {canEditMoney && (
+          <Button variant="primary" onClick={() => setCreating(true)}>
+            <Plus size={18} />
+            Создать оплату
+          </Button>
+        )}
       </div>
 
       {/* Месяцы — тот же фильтр периода, что в кампаниях. */}
@@ -652,6 +663,13 @@ export default function ContractOverview() {
           onClose={() => setPaymentAnchor(null)}
         />
       )}
+
+      {/* Оплата — новый договор; по умолчанию начинается с месяца вкладки. */}
+      <PaymentForm
+        open={creating}
+        period={activePeriod}
+        onClose={() => setCreating(false)}
+      />
     </FadeIn>
   )
 }

@@ -48,7 +48,13 @@ export function AnchoredPopover({
       if (ref.current?.contains(e.target) || anchorEl.contains(e.target)) return
       onClose()
     }
-    const onKey = (e) => e.key === 'Escape' && onClose()
+    // Escape закрывает только меню: окно, в котором оно открыто, слушает
+    // window — дальше document событие не пускаем.
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return
+      e.stopPropagation()
+      onClose()
+    }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
     return () => {
