@@ -223,7 +223,8 @@ export default function Campaigns() {
   const { data: advertisers = [] } = useVisibleAdvertisers()
   const advertiserById = (id) => advertisers.find((a) => a.id === id)
   const { mutate: saveAmounts } = useSaveContractAmounts()
-  const { mutate: savePaymentStatusFor } = useSetPaymentStatus()
+  const { mutate: savePaymentStatusFor, isPending: savingPaymentStatus } =
+    useSetPaymentStatus()
   const { mutate: updatePayment } = useUpdatePayment()
   const { mutate: deletePayment } = useDeletePayment()
   const toast = useToast()
@@ -426,13 +427,15 @@ export default function Campaigns() {
         input: { budget: String(budget), spent: String(spent), paidAt },
       },
       {
-        // Поповер намеренно не закрываем — можно внести следующее поступление.
-        onSuccess: () =>
+        // Сохранили — закрываем поповер; при ошибке он остаётся с суммами.
+        onSuccess: () => {
+          setMoney(null)
           toast.success(
             gained > 0
               ? `Поступление по договору ${number} внесено`
               : `Суммы договора ${number} обновлены`,
-          ),
+          )
+        },
         onError: (err) =>
           toast.error(err.message || 'Не удалось сохранить суммы договора'),
       },
@@ -499,8 +502,6 @@ export default function Campaigns() {
   const savePaymentStatus = (next, changedAt, period) => {
     if (!selectedContract) return
     const number = selectedContract.number
-    setStatusAnchor(null)
-
     savePaymentStatusFor(
       {
         id: selectedContract.id,
@@ -512,7 +513,9 @@ export default function Campaigns() {
         },
       },
       {
+        // Поповер ждёт ответа: на кнопке загрузка, при ошибке он остаётся.
         onSuccess: () => {
+          setStatusAnchor(null)
           const [statusYear, statusMonth] = period.split('-')
           toast.success(
             `Договор ${number}, ${MONTHS_FULL[
@@ -1171,6 +1174,7 @@ export default function Campaigns() {
           statusByPeriod={statusByPeriod}
           period={activePeriod ?? periodKey(activeYear, new Date().getMonth())}
           years={years}
+          saving={savingPaymentStatus}
           readOnly={!canEditMoney}
           onSave={savePaymentStatus}
           onClose={() => setStatusAnchor(null)}

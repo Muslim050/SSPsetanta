@@ -136,7 +136,8 @@ export default function ContractOverview() {
   const { rows: allRows, isPending, isError, error, refetch } = useContracts()
   const { mutate: updateContract } = useUpdateContract()
   const { mutate: saveAmounts } = useSaveContractAmounts()
-  const { mutate: savePaymentStatusFor } = useSetPaymentStatus()
+  const { mutate: savePaymentStatusFor, isPending: savingPaymentStatus } =
+    useSetPaymentStatus()
   const { mutate: updatePayment } = useUpdatePayment()
   const { mutate: deletePayment } = useDeletePayment()
   const toast = useToast()
@@ -258,13 +259,15 @@ export default function ContractOverview() {
         input: { budget: String(budget), spent: String(spent), paidAt },
       },
       {
-        // Поповер намеренно не закрываем — можно внести следующее поступление.
-        onSuccess: () =>
+        // Сохранили — закрываем поповер; при ошибке он остаётся с суммами.
+        onSuccess: () => {
+          setMoneyAnchor(null)
           toast.success(
             gained > 0
               ? `Поступление по договору ${contract.number} внесено`
               : `Суммы договора ${contract.number} обновлены`,
-          ),
+          )
+        },
         onError: (err) =>
           toast.error(err.message || 'Не удалось сохранить суммы договора'),
       },
@@ -322,8 +325,6 @@ export default function ContractOverview() {
   const savePaymentStatus = (next, changedAt, period) => {
     const contract = paymentRow?.contract
     if (!contract) return
-    setPaymentAnchor(null)
-
     savePaymentStatusFor(
       {
         id: contract.id,
@@ -335,7 +336,9 @@ export default function ContractOverview() {
         },
       },
       {
+        // Поповер ждёт ответа: на кнопке загрузка, при ошибке он остаётся.
         onSuccess: () => {
+          setPaymentAnchor(null)
           const [statusYear, statusMonth] = period.split('-')
           toast.success(
             `Договор ${contract.number}, ${MONTHS_FULL[
@@ -685,6 +688,7 @@ export default function ContractOverview() {
           years={years}
           // Месяц выбран вкладкой — в поповере меняется только число.
           monthLocked={activePeriod != null}
+          saving={savingPaymentStatus}
           readOnly={!canEditMoney}
           onSave={savePaymentStatus}
           onClose={() => setPaymentAnchor(null)}

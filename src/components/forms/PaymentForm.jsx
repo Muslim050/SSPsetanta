@@ -8,15 +8,22 @@ import { Button } from '@/components/ui/Button'
 import { Field, Input, Select } from '@/components/ui/Field'
 import { MultiSelect } from '@/components/ui/MultiSelect.jsx'
 import { FilePicker } from '@/components/ui/FilePicker.jsx'
+import { DatePicker } from '@/components/ui/DatePicker.jsx'
 import { Logo } from '@/components/Logo'
 import { MONTHS_FULL } from '@/components/campaigns/MonthTabs.jsx'
 import { LEAGUES, PACKAGES } from '@/lib/metrics.js'
 
-/** Пустая форма; начало договора — первое число выбранного месяца. */
+/** Последнее число месяца 'YYYY-MM' — как 'YYYY-MM-DD'. */
+const lastDayOf = (period) => {
+  const [year, month] = period.split('-').map(Number)
+  return `${period}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`
+}
+
+/** Пустая форма; срок договора — выбранный месяц, с 1-го по последнее число. */
 const emptyForm = (period) => ({
   advertiserId: null,
   start: period ? `${period}-01` : '',
-  end: '',
+  end: period ? lastDayOf(period) : '',
   number: '',
   file: null,
   package: '',
@@ -31,8 +38,9 @@ const dateOrNull = (value) => (value?.trim() ? value : null)
  * организации — те же поля и тот же запрос, что в карточке рекламодателя
  * (`POST /advertisers/:id/contracts`). Договор сразу появляется в таблице.
  *
- * period — месяц, выбранный во вкладках страницы ('YYYY-MM'): с его первого
- * числа по умолчанию начинается договор, иначе строки не видно в этом месяце.
+ * period — месяц, выбранный во вкладках страницы ('YYYY-MM'): по умолчанию
+ * договор с его первого по последнее число, иначе строки не видно в этом
+ * месяце.
  */
 export function PaymentForm({ open, onClose, period }) {
   const { data: advertisers = [] } = useVisibleAdvertisers()
@@ -152,19 +160,19 @@ export function PaymentForm({ open, onClose, period }) {
         {/* Поля договора — как в карточке рекламодателя. */}
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Начало">
-            <Input
-              type="date"
+            <DatePicker
               value={form.start}
               max={form.end || undefined}
-              onChange={(e) => set('start', e.target.value)}
+              onChange={(value) => set('start', value)}
+              clearable
             />
           </Field>
           <Field label="Окончание">
-            <Input
-              type="date"
+            <DatePicker
               value={form.end}
               min={form.start || undefined}
-              onChange={(e) => set('end', e.target.value)}
+              onChange={(value) => set('end', value)}
+              clearable
             />
           </Field>
         </div>
