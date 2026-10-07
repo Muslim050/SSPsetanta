@@ -190,9 +190,6 @@ export function CampaignForm({ open, onClose, initial, defaultAdvertiserId }) {
     if (form.startDate && form.endDate && form.endDate < form.startDate) {
       err.endDate = 'Окончание должно быть позже начала'
     }
-    // Без ролика заявку не заводим: площадка иначе принимает в работу
-    // кампанию, которую нечем показывать в эфире.
-    if (!creative) err.creative = 'Загрузите рекламный ролик'
     setErrors(err)
     if (Object.keys(err).length) return
 
@@ -430,7 +427,6 @@ export function CampaignForm({ open, onClose, initial, defaultAdvertiserId }) {
 
           <Field
             label="Рекламный ролик"
-            required
             error={errors.creative}
             hint={
               creativeLocked
