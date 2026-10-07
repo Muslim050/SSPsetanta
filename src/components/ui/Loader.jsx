@@ -25,7 +25,7 @@ const ARC = {
  *   className?: string,
  * }} props
  */
-export function Loader({ label, size = 208, full = false, className }) {
+export function Loader({ label, size = 264, full = false, className }) {
   return (
     <div
       role="status"
