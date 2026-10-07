@@ -127,6 +127,9 @@ export function CampaignForm({ open, onClose, initial, defaultAdvertiserId }) {
       ? form.advertiserId
       : user?.advertiserId
   const advertiser = advertisers.find((a) => a.id === advertiserId)
+  // Ролик обязателен у новой заявки, если так отмечено у бренда
+  // (`isCreativeRequired`). Флага нет — ролик необязателен.
+  const creativeRequired = !editing && advertiser?.isCreativeRequired === true
   // Договоры бренда — из них выбирается номер, всё остальное сервер
   // подставит в кампанию сам.
   const contracts = advertiser?.contracts ?? []
@@ -159,7 +162,8 @@ export function CampaignForm({ open, onClose, initial, defaultAdvertiserId }) {
   /** Сменили бренд — его договоры другие, выбранный номер сбрасываем. */
   const pickAdvertiser = (id) => {
     setForm((f) => ({ ...f, advertiserId: id, contractNumber: '' }))
-    setErrors((e) => ({ ...e, advertiserId: undefined }))
+    // У другого бренда ролик может быть необязательным.
+    setErrors((e) => ({ ...e, advertiserId: undefined, creative: undefined }))
   }
 
   /**
@@ -189,6 +193,9 @@ export function CampaignForm({ open, onClose, initial, defaultAdvertiserId }) {
     if (!form.endDate) err.endDate = 'Укажите окончание периода'
     if (form.startDate && form.endDate && form.endDate < form.startDate) {
       err.endDate = 'Окончание должно быть позже начала'
+    }
+    if (creativeRequired && !creative) {
+      err.creative = 'Загрузите рекламный ролик'
     }
     setErrors(err)
     if (Object.keys(err).length) return
@@ -427,6 +434,7 @@ export function CampaignForm({ open, onClose, initial, defaultAdvertiserId }) {
 
           <Field
             label="Рекламный ролик"
+            required={creativeRequired}
             error={errors.creative}
             hint={
               creativeLocked

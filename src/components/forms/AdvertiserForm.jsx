@@ -17,6 +17,7 @@ import { Field, Input, Select, Textarea } from '@/components/ui/Field'
 import { MultiSelect } from '@/components/ui/MultiSelect.jsx'
 import { FilePicker } from '@/components/ui/FilePicker.jsx'
 import { SegmentTabs } from '@/components/ui/Tabs.jsx'
+import { Switch } from '@/components/ui/Switch.jsx'
 import { ADV_STATUS, LEAGUES, PACKAGES } from '@/lib/metrics.js'
 import { uid } from '@/lib/id.js'
 import { cn } from '@/lib/cn.js'
@@ -43,6 +44,8 @@ const emptyForm = {
   color: PALETTE[0],
   // Логотип бренда: { name, url } либо null.
   logo: null,
+  // Обязателен ли ролик в новой кампании бренда.
+  isCreativeRequired: false,
   contracts: [],
 }
 
@@ -149,6 +152,7 @@ const formFrom = (advertiser) => ({
   requisites: requisitesToText(advertiser.requisites),
   color: advertiser.color,
   logo: logoToFile(advertiser),
+  isCreativeRequired: advertiser.isCreativeRequired ?? false,
   contracts: (advertiser.contracts ?? []).map((contract) => ({
     ...contract,
     leagues: [...(contract.leagues ?? [])],
@@ -336,6 +340,12 @@ export function AdvertiserForm({ open, onClose, initial }) {
       } else advertiser.logo = form.logo.url
     }
 
+    // Флаг ролика — только если его поменяли: на средах, где поля ещё нет,
+    // иначе каждое сохранение без правок уходило бы запросом.
+    if (form.isCreativeRequired !== (source?.isCreativeRequired ?? false)) {
+      advertiser.isCreativeRequired = form.isCreativeRequired
+    }
+
     // Договоры без номера не сохраняем — из них нечего выбирать в кампании.
     const previousById = new Map(
       (source?.contracts ?? []).map((contract) => [contract.id, contract]),
@@ -506,6 +516,22 @@ export function AdvertiserForm({ open, onClose, initial }) {
             </Select>
           </Field>
         </div>
+
+        {/* По флагу форма кампании требует ролик у новой заявки бренда. */}
+        <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-line bg-paper/55 px-4 py-3">
+          <span className="min-w-0">
+            <span className="block text-[13px] font-medium text-ink">
+              Рекламный ролик обязателен
+            </span>
+            <span className="block text-xs text-ink-muted">
+              Без ролика кампанию этого рекламодателя не создать.
+            </span>
+          </span>
+          <Switch
+            checked={form.isCreativeRequired}
+            onChange={(value) => set('isCreativeRequired', value)}
+          />
+        </label>
 
         <Field
           label="Реквизиты"

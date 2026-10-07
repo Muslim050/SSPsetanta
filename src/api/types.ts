@@ -156,6 +156,11 @@ export interface Advertiser {
   requisites: string
   /** Сколько кампаний у бренда — считает сервер, без удалённых. */
   campaignsCount: number
+  /**
+   * Обязателен ли ролик в новой заявке бренда. Пока есть только на проде —
+   * на других средах поля нет, и ролик необязателен.
+   */
+  isCreativeRequired?: boolean
   /** Только для чтения: договоры правятся своими эндпоинтами. */
   contracts: Contract[]
   createdAt: string
@@ -176,6 +181,7 @@ export type AdvertiserInput = Partial<
     | 'color'
     | 'logo'
     | 'requisites'
+    | 'isCreativeRequired'
   >
 > & {
   /** Логотип файлом: id из загрузчика. `null` — убрать логотип. */
