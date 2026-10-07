@@ -69,10 +69,14 @@ export function Loader({ label, size = 440, full = false, className }) {
               Platform
             </span>
           </span>
+          {/* Что грузим — внутри круга, фирменным жёлтым потемнее: чистый
+              #FFD106 на светлом фоне не читается. */}
+          {label && (
+            <p className="text-[15px] font-medium text-indigo-700">{label}</p>
+          )}
         </div>
       </div>
 
-      {label && <p className="text-[13px] text-ink-muted">{label}</p>}
       <span className="sr-only">Загрузка</span>
     </div>
   )
