@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Loader2, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Field, Input } from '@/components/ui/Field'
+import { Calendar } from '@/components/ui/calendar'
 import { MONTHS_SHORT, MONTHS_FULL } from '@/components/campaigns/MonthTabs.jsx'
 import { formatDateTime } from '@/lib/format.js'
 import { cn } from '@/lib/cn.js'
@@ -36,62 +37,21 @@ const moveToMonth = (value, year, month) => {
 /** Ключ месяца: 2026-08. Им же статус привязан к вкладке месяца. */
 export const periodKey = (year, month) => `${year}-${pad(month + 1)}`
 
-// Дни недели календаря — с понедельника.
-const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
-
 /**
  * Дни одного месяца — для даты смены, когда месяц уже выбран вкладкой на
- * странице: меняется только число. Будущие дни недоступны — смена статуса
- * не бывает завтрашней.
+ * странице: меняется только число, листать месяцы нельзя.
  */
 function MonthDays({ year, month, value, onPick }) {
-  const selected = new Date(value)
-  const days = new Date(year, month + 1, 0).getDate()
-  // Сколько пустых клеток до 1-го числа: неделя начинается с понедельника.
-  const offset = (new Date(year, month, 1).getDay() + 6) % 7
-  const today = new Date()
-  today.setHours(23, 59, 59, 999)
-
   return (
-    <div>
-      <div className="grid grid-cols-7 gap-0.5 text-center text-[10px] font-medium uppercase text-ink-muted">
-        {WEEKDAYS.map((day) => (
-          <span key={day} className="py-1">
-            {day}
-          </span>
-        ))}
-      </div>
-      <div className="grid grid-cols-7 gap-0.5">
-        {Array.from({ length: offset }, (_, index) => (
-          <span key={`empty-${index}`} />
-        ))}
-        {Array.from({ length: days }, (_, index) => {
-          const day = index + 1
-          const active =
-            selected.getFullYear() === year &&
-            selected.getMonth() === month &&
-            selected.getDate() === day
-          return (
-            <button
-              key={day}
-              type="button"
-              disabled={new Date(year, month, day) > today}
-              onClick={() => onPick(day)}
-              aria-pressed={active}
-              title={`${day} ${MONTHS_FULL[month].toLowerCase()} ${year}`}
-              className={cn(
-                'h-8 rounded-lg text-[12px] font-medium transition-colors focus-ring tnum disabled:cursor-default disabled:text-ink-muted/40',
-                active
-                  ? 'bg-indigo-500 font-semibold text-ink'
-                  : 'text-ink-soft enabled:hover:bg-ink/5 enabled:hover:text-ink',
-              )}
-            >
-              {day}
-            </button>
-          )
-        })}
-      </div>
-    </div>
+    <Calendar
+      mode="single"
+      month={new Date(year, month, 1)}
+      hideNavigation
+      showOutsideDays={false}
+      selected={new Date(value)}
+      onSelect={(date) => date && onPick(date.getDate())}
+      className="mx-auto p-0 [--cell-size:--spacing(9)]"
+    />
   )
 }
 
@@ -112,6 +72,7 @@ const parsePeriod = (period) => {
  * statusByPeriod: { '2026-08': { status, changedAt } } — раскраска месяцев
  * monthLocked — месяц уже выбран вкладкой на странице: выбора месяца в
  *   поповере нет, а дата смены — число этого месяца.
+ * saving — запрос ещё идёт: на кнопке загрузка, повторно не отправляем.
  */
 export function StatusPopover({
   anchorEl,
@@ -123,6 +84,7 @@ export function StatusPopover({
   period,
   years,
   monthLocked = false,
+  saving = false,
   readOnly = false,
   onSave,
   onClose,
@@ -209,10 +171,10 @@ export function StatusPopover({
   const selectedPeriod = periodKey(year, month)
   // Статус месяца, который сейчас выбран в поповере.
   const periodStatus = statusByPeriod[selectedPeriod]?.status ?? null
-  const unchanged = draft === periodStatus
 
+  // Тот же статус сохранить можно: так переносят дату смены.
   const save = () => {
-    if (unchanged || !changedAt) return
+    if (saving || !changedAt) return
     onSave(draft, new Date(changedAt).toISOString(), selectedPeriod)
   }
 
@@ -430,9 +392,16 @@ export function StatusPopover({
               size="sm"
               className="flex-1"
               onClick={save}
-              disabled={unchanged || !changedAt}
+              disabled={saving || !changedAt}
             >
-              Сохранить
+              {saving ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  Сохраняем…
+                </>
+              ) : (
+                'Сохранить'
+              )}
             </Button>
             <Button size="sm" variant="secondary" onClick={onClose}>
               Отмена
