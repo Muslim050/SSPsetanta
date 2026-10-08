@@ -10,6 +10,7 @@ import {
   useUpdateContract,
 } from '@/features/contracts/queries'
 import { contractFileInput } from '@/features/contracts/files'
+import { reportContractDeleteError } from '@/features/contracts/deleteError'
 import { downloadFile } from '@/features/files/download'
 import { useAuth } from '@/features/auth/useAuth'
 import { useToast } from '@/components/ui/Toast.jsx'
@@ -201,7 +202,11 @@ export function ContractModal({ open, contract, advertiser, onClose }) {
           onClose()
         },
         onError: (err) =>
-          toast.error(err.message || 'Не удалось удалить договор'),
+          reportContractDeleteError(err, {
+            confirm,
+            toast,
+            number: contract.number,
+          }),
       },
     )
   }

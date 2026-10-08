@@ -5,7 +5,7 @@
  */
 export const OVERVIEW_DEFAULTS = {
   summary: {
-    title: 'Общая статистика эфира',
+    title: 'Общая статистика Setanta Sports',
     subtitle: 'Ключевые показатели телевизионных и digital-размещений.',
     publications: 14,
     socialImpressions: 495246,
@@ -260,7 +260,17 @@ export function overviewForPeriod(period) {
  * месяцы не знают о разделах, добавленных позже, — иначе страница падала бы
  * на первом же обращении к ним.
  */
+// Прежний заголовок по умолчанию. В сохранённых правках месяца он мог
+// остаться, хотя его никто не вводил, — подменяем на нынешний. Свой
+// заголовок, введённый вручную, не трогаем.
+const OLD_DEFAULT_TITLE = 'Общая статистика эфира'
+
 export function fillOverview(saved, period) {
   const defaults = overviewForPeriod(period)
-  return saved ? { ...defaults, ...saved } : defaults
+  if (!saved) return defaults
+  const filled = { ...defaults, ...saved }
+  if (filled.summary?.title === OLD_DEFAULT_TITLE) {
+    filled.summary = { ...filled.summary, title: defaults.summary.title }
+  }
+  return filled
 }

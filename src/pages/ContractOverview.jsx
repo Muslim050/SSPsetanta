@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   CalendarCheck,
@@ -8,6 +8,7 @@ import {
   FileText,
   FolderOpen,
   Pencil,
+  Plus,
   Search,
 } from 'lucide-react'
 import { useAuth } from '@/features/auth/useAuth'
@@ -44,7 +45,9 @@ import { EmptyState } from '@/components/ui/EmptyState.jsx'
 import { Loader } from '@/components/ui/Loader.jsx'
 import { FadeIn } from '@/components/ui/FadeIn.jsx'
 import { Progress } from '@/components/ui/Progress.jsx'
+import { AnchoredPopover } from '@/components/ui/AnchoredPopover.jsx'
 import { ContractPreviewModal } from '@/components/campaigns/ContractPreviewModal.jsx'
+import { PaymentForm } from '@/components/forms/PaymentForm.jsx'
 import { MoneyPopover } from '@/components/campaigns/MoneyPopover.jsx'
 import { MonthTabs, MONTHS_FULL } from '@/components/campaigns/MonthTabs.jsx'
 import {
@@ -55,6 +58,29 @@ import { cn } from '@/lib/cn.js'
 import { advertiserLogo } from '@/features/advertisers/logo'
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => i)
+
+// На «Статусе оплаты» статус «Ожидает оплату» подписан «В процессе» —
+// в кампаниях подпись прежняя.
+const PAYMENT_LABELS = {
+  awaiting: 'В процессе',
+  paid: CONTRACT_PAYMENT.paid.label,
+}
+// «В процессе» здесь оранжевый, а не красный.
+const PAYMENT_BADGES = {
+  awaiting: 'bg-warning/20 text-warning',
+  paid: CONTRACT_PAYMENT.paid.badge,
+}
+const STATUS_OPTIONS = PAYMENT_OPTIONS.map((option) => ({
+  ...option,
+  label: PAYMENT_LABELS[option.value],
+  badge: PAYMENT_BADGES[option.value],
+  dot: option.value === 'paid' ? 'bg-success' : 'bg-warning',
+}))
+// Подсказки и цвет вкладок месяцев.
+const MONTH_STATUS_TITLES = { paid: 'оплачен', awaiting: 'в процессе' }
+const MONTH_STATUS_FILLS = {
+  awaiting: 'bg-warning/25 font-semibold text-warning hover:bg-warning/35',
+}
 
 /** Границы месяца в ISO — с ними и сравниваем срок договора. */
 function monthBounds(year, month) {
@@ -110,7 +136,8 @@ export default function ContractOverview() {
   const { rows: allRows, isPending, isError, error, refetch } = useContracts()
   const { mutate: updateContract } = useUpdateContract()
   const { mutate: saveAmounts } = useSaveContractAmounts()
-  const { mutate: savePaymentStatusFor } = useSetPaymentStatus()
+  const { mutate: savePaymentStatusFor, isPending: savingPaymentStatus } =
+    useSetPaymentStatus()
   const { mutate: updatePayment } = useUpdatePayment()
   const { mutate: deletePayment } = useDeletePayment()
   const toast = useToast()
@@ -129,6 +156,8 @@ export default function ContractOverview() {
   // обновляться сразу после сохранения.
   const [moneyAnchor, setMoneyAnchor] = useState(null)
   const [paymentAnchor, setPaymentAnchor] = useState(null)
+  // Окно «Создать оплату».
+  const [creating, setCreating] = useState(false)
 
   // Рекламодатель видит только свои договоры, площадка — все.
   const rows = isAdvertiser
@@ -204,17 +233,12 @@ export default function ContractOverview() {
     .sort((a, b) => (a.paidAt < b.paidAt ? 1 : -1))
 
   // Суммы ведутся по договорам — здесь складываем их по всем видимым.
-  // Месяц закрыт по договору — значит он оплачен полностью: показываем 100%
-  // и нулевой остаток, даже если в самой записи освоено меньше.
-  const spentOf = (contract) =>
-    activePeriod && statusAt(contract, activePeriod) === 'paid'
-      ? toNumber(contract.budget)
-      : toNumber(contract.spent)
-
+  // «Оплачено» — всегда сумма `spent` с сервера: статус месяца («Оплачено»)
+  // её не подменяет, иначе договор на 4 из 5 млн выглядел бы закрытым на 100%.
   const money = scoped.reduce(
     (acc, { contract }) => ({
       budget: acc.budget + toNumber(contract.budget),
-      spent: acc.spent + spentOf(contract),
+      spent: acc.spent + toNumber(contract.spent),
     }),
     { budget: 0, spent: 0 },
   )
@@ -235,13 +259,15 @@ export default function ContractOverview() {
         input: { budget: String(budget), spent: String(spent), paidAt },
       },
       {
-        // Поповер намеренно не закрываем — можно внести следующее поступление.
-        onSuccess: () =>
+        // Сохранили — закрываем поповер; при ошибке он остаётся с суммами.
+        onSuccess: () => {
+          setMoneyAnchor(null)
           toast.success(
             gained > 0
               ? `Поступление по договору ${contract.number} внесено`
               : `Суммы договора ${contract.number} обновлены`,
-          ),
+          )
+        },
         onError: (err) =>
           toast.error(err.message || 'Не удалось сохранить суммы договора'),
       },
@@ -299,8 +325,6 @@ export default function ContractOverview() {
   const savePaymentStatus = (next, changedAt, period) => {
     const contract = paymentRow?.contract
     if (!contract) return
-    setPaymentAnchor(null)
-
     savePaymentStatusFor(
       {
         id: contract.id,
@@ -312,12 +336,14 @@ export default function ContractOverview() {
         },
       },
       {
+        // Поповер ждёт ответа: на кнопке загрузка, при ошибке он остаётся.
         onSuccess: () => {
+          setPaymentAnchor(null)
           const [statusYear, statusMonth] = period.split('-')
           toast.success(
             `Договор ${contract.number}, ${MONTHS_FULL[
               Number(statusMonth) - 1
-            ].toLowerCase()} ${statusYear}: ${CONTRACT_PAYMENT[next].label}`,
+            ].toLowerCase()} ${statusYear}: ${PAYMENT_LABELS[next]}`,
           )
         },
         onError: (err) =>
@@ -428,6 +454,13 @@ export default function ContractOverview() {
             className="h-11 w-full rounded-xl border border-line bg-surface pl-10 pr-3.5 text-sm text-ink placeholder:text-ink-muted focus-ring focus-visible:border-indigo-300"
           />
         </div>
+        {/* Заводит площадка; наблюдателю кнопки нет. */}
+        {canEditMoney && (
+          <Button variant="primary" onClick={() => setCreating(true)}>
+            <Plus size={18} />
+            Создать оплату
+          </Button>
+        )}
       </div>
 
       {/* Месяцы — тот же фильтр периода, что в кампаниях. */}
@@ -440,6 +473,8 @@ export default function ContractOverview() {
           onChange={setMonth}
           counts={monthCounts}
           statuses={monthStatuses}
+          statusTitles={MONTH_STATUS_TITLES}
+          statusFills={MONTH_STATUS_FILLS}
         />
       </div>
 
@@ -491,7 +526,7 @@ export default function ContractOverview() {
             <tbody>
               {filtered.map(({ contract, advertiser }, i) => {
                 const budget = toNumber(contract.budget)
-                const spent = spentOf(contract)
+                const spent = toNumber(contract.spent)
                 const pacing = budget ? (spent / budget) * 100 : 0
                 // Остаток — сколько по договору ещё не закрыто деньгами.
                 const rest = budget - spent
@@ -646,16 +681,26 @@ export default function ContractOverview() {
           anchorEl={paymentAnchor.el}
           title={`Договор ${paymentRow.contract.number}`}
           value={statusAt(paymentRow.contract, activePeriod) ?? 'awaiting'}
-          options={PAYMENT_OPTIONS}
+          options={STATUS_OPTIONS}
           history={paymentRow.contract.paymentLog ?? []}
           statusByPeriod={paymentRow.contract.paymentStatusByPeriod ?? {}}
           period={activePeriod ?? periodKey(activeYear, new Date().getMonth())}
           years={years}
+          // Месяц выбран вкладкой — в поповере меняется только число.
+          monthLocked={activePeriod != null}
+          saving={savingPaymentStatus}
           readOnly={!canEditMoney}
           onSave={savePaymentStatus}
           onClose={() => setPaymentAnchor(null)}
         />
       )}
+
+      {/* Оплата — новый договор; по умолчанию начинается с месяца вкладки. */}
+      <PaymentForm
+        open={creating}
+        period={activePeriod}
+        onClose={() => setCreating(false)}
+      />
     </FadeIn>
   )
 }
@@ -667,27 +712,24 @@ const DOTS = {
   danger: 'bg-danger',
 }
 
-/** Карандаш в строке: меняет только статус договора. */
+/**
+ * Карандаш в строке: меняет только статус договора. Меню — AnchoredPopover:
+ * таблица его не обрежет, у нижних строк оно откроется вверх.
+ */
 function StatusMenu({ contract, value, onPick }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef(null)
-
-  useEffect(() => {
-    const h = (e) =>
-      ref.current && !ref.current.contains(e.target) && setOpen(false)
-    document.addEventListener('mousedown', h)
-    return () => document.removeEventListener('mousedown', h)
-  }, [])
+  // Кнопка, от которой открыто меню; null — меню закрыто.
+  const [anchorEl, setAnchorEl] = useState(null)
+  const open = !!anchorEl
 
   return (
-    <span className="relative" ref={ref}>
+    <span className="relative">
       <Button
         variant="secondary"
         size="sm"
         className={`h-9 w-9 shrink-0 px-0 hover:border-indigo-400 hover:bg-indigo-100 hover:text-ink ${
           open ? 'border-indigo-400 bg-indigo-100' : ''
         }`}
-        onClick={() => setOpen((v) => !v)}
+        onClick={(e) => setAnchorEl(open ? null : e.currentTarget)}
         aria-label={`Изменить статус договора ${contract.number}`}
         title="Изменить статус"
       >
@@ -695,13 +737,18 @@ function StatusMenu({ contract, value, onPick }) {
       </Button>
 
       {open && (
-        <span className="absolute right-0 top-full z-20 mt-1 flex w-48 flex-col overflow-hidden rounded-xl border border-line bg-surface p-1.5 text-left shadow-lift">
+        <AnchoredPopover
+          anchorEl={anchorEl}
+          onClose={() => setAnchorEl(null)}
+          align="right"
+          width={192}
+        >
           {Object.entries(CONTRACT_STATUS).map(([key, meta]) => (
             <button
               key={key}
               type="button"
               onClick={() => {
-                setOpen(false)
+                setAnchorEl(null)
                 onPick(key)
               }}
               className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors ${
@@ -719,7 +766,7 @@ function StatusMenu({ contract, value, onPick }) {
               )}
             </button>
           ))}
-        </span>
+        </AnchoredPopover>
       )}
     </span>
   )
@@ -768,11 +815,10 @@ function MoneyCell({ budget, spent, pacing, editable, onOpen }) {
  */
 function PaymentPill({ status, editable, onOpen }) {
   const tone = paymentTone(status)
-  const meta = tone ? CONTRACT_PAYMENT[tone] : null
-  const label = meta?.label ?? 'Нет отметки'
+  const label = tone ? PAYMENT_LABELS[tone] : 'Нет отметки'
   const shell = cn(
     'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[12px] font-semibold',
-    meta ? meta.badge : 'bg-ink/6 text-ink-muted',
+    tone ? PAYMENT_BADGES[tone] : 'bg-ink/6 text-ink-muted',
   )
 
   if (!editable) return <span className={shell}>{label}</span>

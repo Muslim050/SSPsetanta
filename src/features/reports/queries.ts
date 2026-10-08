@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as reportsApi from '@/api/endpoints/reports'
 import { isApiError } from '@/api/errors'
 import type {
+  ManualReportInput,
   Paginated,
   Report,
   ReportImport,
@@ -10,6 +11,7 @@ import type {
   ReportSheet,
   ReportSheetCode,
   ReportSheetInput,
+  TotalStatistics,
 } from '@/api/types'
 
 export const reportKeys = {
@@ -18,6 +20,10 @@ export const reportKeys = {
     [...reportKeys.all, 'months', contractId] as const,
   report: (contractId: number, period: ReportPeriod) =>
     [...reportKeys.all, 'report', contractId, period] as const,
+  manual: (contractId: number, period: ReportPeriod) =>
+    [...reportKeys.all, 'manual', contractId, period] as const,
+  totalStats: (contractId: number, period: ReportPeriod) =>
+    [...reportKeys.all, 'total-stats', contractId, period] as const,
   imports: (contractId: number, period: ReportPeriod) =>
     [...reportKeys.all, 'imports', contractId, period] as const,
   /** Ключ загрузки файла — по нему отчёт видит, что идёт разбор. */
@@ -58,6 +64,50 @@ export function useReport(
     queryFn: (): Promise<Report> =>
       reportsApi.get(contractId as number, period as ReportPeriod),
     enabled: enabled && !!contractId && !!period,
+    retry: retryServerErrors,
+  })
+}
+
+/**
+ * Ручной отчёт за месяц — цифры вкладки Spot. Он отдельный от файлового, и
+ * его нет в списке месяцев, поэтому спрашиваем всегда; 404 — ручного
+ * отчёта нет, это не ошибка: отдаём null.
+ */
+export function useManualReport(
+  contractId: number | null | undefined,
+  period: ReportPeriod | null | undefined,
+) {
+  return useQuery({
+    queryKey: reportKeys.manual(contractId ?? 0, period ?? ''),
+    queryFn: async (): Promise<Report | null> => {
+      try {
+        return await reportsApi.getManual(
+          contractId as number,
+          period as ReportPeriod,
+        )
+      } catch (error) {
+        if (isApiError(error) && error.status === 404) return null
+        throw error
+      }
+    },
+    enabled: !!contractId && !!period,
+    retry: retryServerErrors,
+  })
+}
+
+/**
+ * Итоги месяца для вкладки Total — считает сервер по обоим отчётам месяца.
+ * Ответ есть всегда, поэтому спрашиваем без оглядки на список месяцев.
+ */
+export function useTotalStatistics(
+  contractId: number | null | undefined,
+  period: ReportPeriod | null | undefined,
+) {
+  return useQuery({
+    queryKey: reportKeys.totalStats(contractId ?? 0, period ?? ''),
+    queryFn: (): Promise<TotalStatistics> =>
+      reportsApi.totalStatistics(contractId as number, period as ReportPeriod),
+    enabled: !!contractId && !!period,
     retry: retryServerErrors,
   })
 }
@@ -114,6 +164,43 @@ export function useImportReport() {
       client.invalidateQueries({
         queryKey: reportKeys.imports(report.contractId, report.period),
       })
+      // Соцсети в итогах Total — из листа нового файла.
+      client.invalidateQueries({
+        queryKey: reportKeys.totalStats(report.contractId, report.period),
+      })
+    },
+  })
+}
+
+/**
+ * Сохранение ручного отчёта за месяц. Ответ кладём в кэш ручного отчёта
+ * сразу — цифры Spot обновятся без ожидания, — и всё равно перечитываем его
+ * за период, а с ним список месяцев: месяц мог появиться впервые. Файловый
+ * отчёт не трогаем — это отдельный отчёт, ручной ввод его не меняет.
+ */
+export function useSaveManualReport() {
+  const client = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      contractId,
+      period,
+      input,
+    }: {
+      contractId: number
+      period: ReportPeriod
+      input: ManualReportInput
+    }) => reportsApi.saveManual(contractId, period, input),
+    onSuccess: (report, { contractId, period }) => {
+      client.setQueryData(reportKeys.manual(contractId, period), report)
+      client.invalidateQueries({
+        queryKey: reportKeys.manual(contractId, period),
+      })
+      client.invalidateQueries({ queryKey: reportKeys.months(contractId) })
+      // Счётчики Total считаются из ручного отчёта.
+      client.invalidateQueries({
+        queryKey: reportKeys.totalStats(contractId, period),
+      })
     },
   })
 }
@@ -149,6 +236,12 @@ export function useSaveReportSheet() {
             ),
           },
       )
+      // Соцсети в итогах Total — из листа `social`: правка меняет и их.
+      if (sheet.code === 'social') {
+        client.invalidateQueries({
+          queryKey: reportKeys.totalStats(contractId, period),
+        })
+      }
     },
     onError: (error, { contractId, period }) => {
       if ((error as { status?: number }).status === 409) {

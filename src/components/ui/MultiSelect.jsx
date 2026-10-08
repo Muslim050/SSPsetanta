@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { Check, ChevronDown } from 'lucide-react'
+import { AnchoredPopover } from '@/components/ui/AnchoredPopover.jsx'
 import { cn } from '@/lib/cn.js'
 
 /**
- * Выпадающий список с мультивыбором.
+ * Выпадающий список с мультивыбором. Список — AnchoredPopover: модалка с
+ * прокруткой его не обрежет, у нижнего края экрана он откроется вверх.
  * options: [{ id, label }], value: string[], onChange: (nextIds) => void
  */
 export function MultiSelect({
@@ -13,21 +15,9 @@ export function MultiSelect({
   placeholder = '— не выбрано —',
   className,
 }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef(null)
-
-  useEffect(() => {
-    if (!open) return
-    const onDown = (e) =>
-      ref.current && !ref.current.contains(e.target) && setOpen(false)
-    const onKey = (e) => e.key === 'Escape' && setOpen(false)
-    document.addEventListener('mousedown', onDown)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('mousedown', onDown)
-      document.removeEventListener('keydown', onKey)
-    }
-  }, [open])
+  // Поле, от которого открыт список; null — список закрыт.
+  const [anchorEl, setAnchorEl] = useState(null)
+  const open = !!anchorEl
 
   const toggle = (id) =>
     onChange(
@@ -37,10 +27,10 @@ export function MultiSelect({
   const selected = options.filter((o) => value.includes(o.id))
 
   return (
-    <div className={cn('relative', className)} ref={ref}>
+    <div className={cn('relative', className)}>
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={(e) => setAnchorEl(open ? null : e.currentTarget)}
         aria-expanded={open}
         className={cn(
           'flex h-11 w-full items-center gap-2 rounded-xl border border-line bg-surface px-3.5 text-left text-sm transition-all focus-ring focus-visible:border-indigo-300',
@@ -72,37 +62,44 @@ export function MultiSelect({
       </button>
 
       {open && (
-        <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-60 overflow-y-auto rounded-xl border border-line bg-surface p-1.5 shadow-lift">
-          {options.map((o) => {
-            const on = value.includes(o.id)
-            return (
-              <button
-                key={o.id}
-                type="button"
-                onClick={() => toggle(o.id)}
-                aria-pressed={on}
-                className={cn(
-                  'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors',
-                  on
-                    ? 'bg-indigo-50 text-indigo-900'
-                    : 'text-ink-soft hover:bg-ink/5 hover:text-ink',
-                )}
-              >
-                <span
+        <AnchoredPopover
+          anchorEl={anchorEl}
+          onClose={() => setAnchorEl(null)}
+          // Список во всю ширину поля, как раньше.
+          width={anchorEl.offsetWidth}
+        >
+          <div className="max-h-56 overflow-y-auto">
+            {options.map((o) => {
+              const on = value.includes(o.id)
+              return (
+                <button
+                  key={o.id}
+                  type="button"
+                  onClick={() => toggle(o.id)}
+                  aria-pressed={on}
                   className={cn(
-                    'flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border',
+                    'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors',
                     on
-                      ? 'border-indigo-400 bg-indigo-100 text-indigo-900'
-                      : 'border-line',
+                      ? 'bg-indigo-50 text-indigo-900'
+                      : 'text-ink-soft hover:bg-ink/5 hover:text-ink',
                   )}
                 >
-                  {on && <Check size={12} />}
-                </span>
-                {o.label}
-              </button>
-            )
-          })}
-        </div>
+                  <span
+                    className={cn(
+                      'flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border',
+                      on
+                        ? 'border-indigo-400 bg-indigo-100 text-indigo-900'
+                        : 'border-line',
+                    )}
+                  >
+                    {on && <Check size={12} />}
+                  </span>
+                  {o.label}
+                </button>
+              )
+            })}
+          </div>
+        </AnchoredPopover>
       )}
     </div>
   )

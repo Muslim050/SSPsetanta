@@ -13,8 +13,9 @@ import { Field, Input, Select } from '@/components/ui/Field'
 import { FilePicker } from '@/components/ui/FilePicker.jsx'
 import { absoluteUrl } from '@/api/endpoints/files'
 import { Logo } from '@/components/Logo'
-import { STATUS, leagueLabel, statusLabel } from '@/lib/metrics.js'
+import { PACKAGES, STATUS, leagueLabel, statusLabel } from '@/lib/metrics.js'
 import { formatDate } from '@/lib/format.js'
+import { cn } from '@/lib/cn.js'
 
 /**
  * Статусы, которых нет в выборе: оплату ведёт договор — помесячно и своим
@@ -34,6 +35,8 @@ const emptyForm = {
   // у ролика договора его нет, такой уходит ссылкой.
   creative: null,
   contractNumber: '',
+  // Бренд заявки — выбирает только площадка на создании.
+  advertiserId: null,
 }
 
 /** Имя файла из ссылки — подпись ролику, если своей нет. */
@@ -80,6 +83,10 @@ const creativeInput = (creative) => {
   }
 }
 
+/** Срок договора одной строкой: «01.01.2026 — 31.12.2026». */
+const contractTerm = (contract) =>
+  [contract?.start, contract?.end].filter(Boolean).map(formatDate).join(' — ')
+
 /** Кампания с сервера → состояние формы. */
 const formFrom = (campaign) => ({
   name: campaign.name,
@@ -91,19 +98,38 @@ const formFrom = (campaign) => ({
   contractNumber: campaign.contractNumber || '',
 })
 
-export function CampaignForm({ open, onClose, initial }) {
+/**
+ * Создание и правка заявки. Заводит заявку рекламодатель — за свой бренд —
+ * или площадка за выбранный бренд: тогда сервер ставит статус «Получен».
+ * `defaultAdvertiserId` — бренд, который подставить площадке сразу
+ * (например, открыта его вкладка).
+ */
+export function CampaignForm({ open, onClose, initial, defaultAdvertiserId }) {
   const { mutate: saveCampaign, isPending } = useSaveCampaign()
   const { data: advertisers = [] } = useVisibleAdvertisers()
   const { user, isAdmin, isAdvertiser } = useAuth()
   const toast = useToast()
   const editing = !!initial
+  // Статус ведёт площадка и только у заведённой заявки.
+  const showStatus = isAdmin && editing
   const [form, setForm] = useState(emptyForm)
   const [errors, setErrors] = useState({})
 
-  // Бренд заявки: у рекламодателя свой, у площадки — бренд правимой кампании.
-  // Сменить его нельзя: на создании сервер берёт бренд из сессии автора.
-  const advertiserId = editing ? initial.advertiserId : user?.advertiserId
+  // Бренд выбирает площадка, когда сама заводит заявку: своего бренда у неё
+  // нет, и сервер ждёт `advertiserId` в теле.
+  const pickBrand = !editing && !isAdvertiser
+  // Бренд заявки: у рекламодателя свой — сервер берёт его из сессии, у
+  // правимой кампании — её, у новой заявки площадки — выбранный. У уже
+  // заведённой заявки бренд не меняется.
+  const advertiserId = editing
+    ? initial.advertiserId
+    : pickBrand
+      ? form.advertiserId
+      : user?.advertiserId
   const advertiser = advertisers.find((a) => a.id === advertiserId)
+  // Ролик обязателен у новой заявки, если так отмечено у бренда
+  // (`isCreativeRequired`). Флага нет — ролик необязателен.
+  const creativeRequired = !editing && advertiser?.isCreativeRequired === true
   // Договоры бренда — из них выбирается номер, всё остальное сервер
   // подставит в кампанию сам.
   const contracts = advertiser?.contracts ?? []
@@ -120,7 +146,11 @@ export function CampaignForm({ open, onClose, initial }) {
 
   useEffect(() => {
     if (!open) return
-    setForm(initial ? formFrom(initial) : emptyForm)
+    setForm(
+      initial
+        ? formFrom(initial)
+        : { ...emptyForm, advertiserId: defaultAdvertiserId ?? null },
+    )
     setErrors({})
     // Зависимости — по id: после сохранения список обновится, и форма иначе
     // сбросила бы несохранённые правки сама на себя.
@@ -128,6 +158,13 @@ export function CampaignForm({ open, onClose, initial }) {
   }, [open, initial?.id])
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
+
+  /** Сменили бренд — его договоры другие, выбранный номер сбрасываем. */
+  const pickAdvertiser = (id) => {
+    setForm((f) => ({ ...f, advertiserId: id, contractNumber: '' }))
+    // У другого бренда ролик может быть необязательным.
+    setErrors((e) => ({ ...e, advertiserId: undefined, creative: undefined }))
+  }
 
   /**
    * Выбрали рекламную кампанию — вместе с ней подтягивается ролик договора.
@@ -149,15 +186,17 @@ export function CampaignForm({ open, onClose, initial }) {
 
   const submit = () => {
     const err = {}
+    if (pickBrand && !form.advertiserId)
+      err.advertiserId = 'Выберите рекламодателя'
     if (!form.name.trim()) err.name = 'Укажите название'
     if (!form.startDate) err.startDate = 'Укажите начало периода'
     if (!form.endDate) err.endDate = 'Укажите окончание периода'
     if (form.startDate && form.endDate && form.endDate < form.startDate) {
       err.endDate = 'Окончание должно быть позже начала'
     }
-    // Без ролика заявку не заводим: площадка иначе принимает в работу
-    // кампанию, которую нечем показывать в эфире.
-    if (!creative) err.creative = 'Загрузите рекламный ролик'
+    if (creativeRequired && !creative) {
+      err.creative = 'Загрузите рекламный ролик'
+    }
     setErrors(err)
     if (Object.keys(err).length) return
 
@@ -171,9 +210,11 @@ export function CampaignForm({ open, onClose, initial }) {
       contractNumber: form.contractNumber.trim(),
       ...creativeInput(creative),
     }
-    // Статус ведёт площадка, и только у существующей заявки: новая всегда
-    // заводится как «Отправлен».
+    // Статус ведёт площадка, и только у существующей заявки: новую сервер
+    // заводит сам — «Отправлен» у рекламодателя, «Получен» у площадки.
     if (editing && isAdmin) campaign.status = form.status
+    // Площадка заводит заявку за бренд — без него сервер отвечает 400.
+    if (pickBrand) campaign.advertiserId = form.advertiserId
 
     saveCampaign(
       { id: initial?.id, campaign },
@@ -234,6 +275,25 @@ export function CampaignForm({ open, onClose, initial }) {
       }
     >
       <div className="space-y-4">
+        {/* Площадка сначала выбирает рекламодателя: от него зависят договоры. */}
+        {pickBrand && (
+          <Field label="Рекламодатель" required error={errors.advertiserId}>
+            <Select
+              value={form.advertiserId ?? ''}
+              onChange={(e) => pickAdvertiser(Number(e.target.value) || null)}
+            >
+              <option value="">— выберите рекламодателя —</option>
+              {[...advertisers]
+                .sort((a, b) => a.name.localeCompare(b.name, 'ru'))
+                .map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+            </Select>
+          </Field>
+        )}
+
         {/* Период кампании идёт первым — с него начинают заполнять форму. */}
         <div>
           <p className="mb-2 text-[13px] font-medium text-ink-soft">
@@ -322,9 +382,23 @@ export function CampaignForm({ open, onClose, initial }) {
           </Field>
         </div>
 
+        {/* Пакет и лиги ведёт площадка в договоре: сервер снимает их с него
+            сам и на запись у кампании закрывает. Здесь только показываем. */}
         <div className="grid gap-4 sm:grid-cols-2">
-          {/* Лиги ведёт площадка в договоре: сервер снимает их с него сам и
-              на запись у кампании закрывает. Здесь только показываем. */}
+          <Field
+            label="Пакет"
+            hint={
+              selectedContract ? undefined : 'Появится из выбранного договора.'
+            }
+          >
+            <Input
+              value={PACKAGES[selectedContract?.package]?.label ?? ''}
+              placeholder="Из договора"
+              disabled
+              readOnly
+            />
+          </Field>
+
           <Field
             label="Лиги"
             hint={
@@ -340,10 +414,27 @@ export function CampaignForm({ open, onClose, initial }) {
               readOnly
             />
           </Field>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          {/* Срок договора менять отсюда нельзя — он живёт в карточке бренда. */}
+          <Field
+            label="Срок договора"
+            hint={
+              selectedContract ? undefined : 'Появится из выбранного договора.'
+            }
+          >
+            <Input
+              value={contractTerm(selectedContract)}
+              placeholder="Из договора"
+              disabled
+              readOnly
+            />
+          </Field>
 
           <Field
             label="Рекламный ролик"
-            required
+            required={creativeRequired}
             error={errors.creative}
             hint={
               creativeLocked
@@ -367,85 +458,56 @@ export function CampaignForm({ open, onClose, initial }) {
           </Field>
         </div>
 
-        {/* Срок договора менять отсюда нельзя — он живёт в карточке бренда. */}
-        <div>
-          <p className="mb-2 text-[13px] font-medium text-ink-soft">
-            Срок договора
-          </p>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Начало">
-              <Input
-                value={
-                  selectedContract?.start
-                    ? formatDate(selectedContract.start)
-                    : ''
-                }
-                placeholder="Из договора"
-                disabled
-                readOnly
-              />
-            </Field>
-            <Field label="Окончание">
-              <Input
-                value={
-                  selectedContract?.end ? formatDate(selectedContract.end) : ''
-                }
-                placeholder="Из договора"
-                disabled
-                readOnly
-              />
-            </Field>
-          </div>
-        </div>
-
-        {/* Скан договора: скачивание закрыто токеном, поэтому не ссылка,
-            а кнопка — файл тянем транспортом и отдаём блобом. */}
-        <Field label="Файл договора">
-          {selectedContract?.file?.url ? (
-            <button
-              type="button"
-              onClick={() => downloadFile(selectedContract.file)}
-              className="flex w-full items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2.5 text-left text-[13px] font-medium text-ink transition-colors hover:border-indigo-300 hover:bg-indigo-50 focus-ring"
-            >
-              <FileText size={16} className="shrink-0 text-indigo-800" />
-              <span className="min-w-0 flex-1 truncate">
-                {selectedContract.file.name}
-              </span>
-              <span className="flex shrink-0 items-center gap-1.5 text-ink-muted">
-                <Download size={15} />
-                Скачать договор
-              </span>
-            </button>
-          ) : (
-            <div className="flex items-center gap-2 rounded-xl border border-dashed border-line px-3 py-2.5 text-[13px] text-ink-muted">
-              <FileText size={16} className="shrink-0" />
-              {selectedContract ? 'К договору не приложен' : 'Из договора'}
-            </div>
-          )}
-        </Field>
-
-        {/* Статус ведёт площадка и только у заведённой заявки. */}
-        {isAdmin && editing && (
-          <Field label="Статус">
-            <Select
-              value={form.status}
-              onChange={(e) => set('status', e.target.value)}
-            >
-              {Object.entries(STATUS)
-                // Скрытый статус оставляем, если он уже стоит у кампании:
-                // иначе select показал бы первый вариант и сохранение молча
-                // сменило бы статус заявки.
-                .filter(
-                  ([k]) => !HIDDEN_STATUS.includes(k) || k === form.status,
-                )
-                .map(([k, v]) => (
-                  <option key={k} value={k}>
-                    {v.label}
-                  </option>
-                ))}
-            </Select>
+        {/* Файл договора и статус — в одну строку; без статуса файл на всю ширину. */}
+        <div className={cn('grid gap-4', showStatus && 'sm:grid-cols-2')}>
+          {/* Скан договора: скачивание закрыто токеном, поэтому не ссылка,
+              а кнопка — файл тянем транспортом и отдаём блобом. */}
+          <Field label="Файл договора">
+            {selectedContract?.file?.url ? (
+              <button
+                type="button"
+                onClick={() => downloadFile(selectedContract.file)}
+                className="flex h-11 w-full items-center gap-2 rounded-xl border border-line bg-surface px-3 text-left text-[13px] font-medium text-ink transition-colors hover:border-indigo-300 hover:bg-indigo-50 focus-ring"
+              >
+                <FileText size={16} className="shrink-0 text-indigo-800" />
+                <span className="min-w-0 flex-1 truncate">
+                  {selectedContract.file.name}
+                </span>
+                <span className="flex shrink-0 items-center gap-1.5 text-ink-muted">
+                  <Download size={15} />
+                  Скачать договор
+                </span>
+              </button>
+            ) : (
+              <div className="flex h-11 items-center gap-2 rounded-xl border border-dashed border-line px-3 text-[13px] text-ink-muted">
+                <FileText size={16} className="shrink-0" />
+                {selectedContract ? 'К договору не приложен' : 'Из договора'}
+              </div>
+            )}
           </Field>
-        )}
+
+          {showStatus && (
+            <Field label="Статус">
+              <Select
+                value={form.status}
+                onChange={(e) => set('status', e.target.value)}
+              >
+                {Object.entries(STATUS)
+                  // Скрытый статус оставляем, если он уже стоит у кампании:
+                  // иначе select показал бы первый вариант и сохранение молча
+                  // сменило бы статус заявки.
+                  .filter(
+                    ([k]) => !HIDDEN_STATUS.includes(k) || k === form.status,
+                  )
+                  .map(([k, v]) => (
+                    <option key={k} value={k}>
+                      {v.label}
+                    </option>
+                  ))}
+              </Select>
+            </Field>
+          )}
+        </div>
       </div>
     </Modal>
   )

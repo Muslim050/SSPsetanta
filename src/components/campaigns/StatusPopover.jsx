@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Loader2, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Field, Input } from '@/components/ui/Field'
+import { Calendar } from '@/components/ui/calendar'
 import { MONTHS_SHORT, MONTHS_FULL } from '@/components/campaigns/MonthTabs.jsx'
 import { formatDateTime } from '@/lib/format.js'
 import { cn } from '@/lib/cn.js'
+import { usePopoverPlacement } from '@/lib/usePopoverPlacement.js'
 
 const WIDTH = 300
 
@@ -35,6 +37,24 @@ const moveToMonth = (value, year, month) => {
 /** Ключ месяца: 2026-08. Им же статус привязан к вкладке месяца. */
 export const periodKey = (year, month) => `${year}-${pad(month + 1)}`
 
+/**
+ * Дни одного месяца — для даты смены, когда месяц уже выбран вкладкой на
+ * странице: меняется только число, листать месяцы нельзя.
+ */
+function MonthDays({ year, month, value, onPick }) {
+  return (
+    <Calendar
+      mode="single"
+      month={new Date(year, month, 1)}
+      hideNavigation
+      showOutsideDays={false}
+      selected={new Date(value)}
+      onSelect={(date) => date && onPick(date.getDate())}
+      className="mx-auto p-0 [--cell-size:--spacing(9)]"
+    />
+  )
+}
+
 const parsePeriod = (period) => {
   const [year, month] = String(period ?? '').split('-')
   return Number.isFinite(Number(year)) && Number.isFinite(Number(month))
@@ -47,9 +67,12 @@ const parsePeriod = (period) => {
  * выбираем вариант, месяц и дату смены. Вторая вкладка — история смен.
  * Рисуется порталом с position: fixed — иначе карточка его обрежет.
  *
- * options: [{ value, label, badge? }]
+ * options: [{ value, label, badge?, dot? }] — dot: цвет точки у месяца
  * history: [{ id, status, period, changedAt, by }]
  * statusByPeriod: { '2026-08': { status, changedAt } } — раскраска месяцев
+ * monthLocked — месяц уже выбран вкладкой на странице: выбора месяца в
+ *   поповере нет, а дата смены — число этого месяца.
+ * saving — запрос ещё идёт: на кнопке загрузка, повторно не отправляем.
  */
 export function StatusPopover({
   anchorEl,
@@ -60,6 +83,8 @@ export function StatusPopover({
   statusByPeriod = {},
   period,
   years,
+  monthLocked = false,
+  saving = false,
   readOnly = false,
   onSave,
   onClose,
@@ -69,13 +94,18 @@ export function StatusPopover({
   // Кто не меняет статус, открывает карточку ради истории.
   const [tab, setTab] = useState(readOnly ? 'history' : 'status')
   const [draft, setDraft] = useState(value)
-  // Смену можно оформить задним числом — дату и время выбирает пользователь.
-  const [changedAt, setChangedAt] = useState(() => toDateTimeInput(new Date()))
   // Месяц, к которому относится статус: по умолчанию выбранный в фильтре.
   const initial = parsePeriod(period) ?? {
     year: new Date().getFullYear(),
     month: new Date().getMonth(),
   }
+  // Смену можно оформить задним числом — дату и время выбирает пользователь.
+  // Месяц закреплён вкладкой — сегодняшнее число, но в этом месяце.
+  const [changedAt, setChangedAt] = useState(() =>
+    monthLocked
+      ? moveToMonth(null, initial.year, initial.month)
+      : toDateTimeInput(new Date()),
+  )
   const [year, setYear] = useState(initial.year)
   const [month, setMonth] = useState(initial.month)
 
@@ -85,6 +115,13 @@ export function StatusPopover({
     setYear(nextYear)
     setMonth(nextMonth)
     setChangedAt((current) => moveToMonth(current, nextYear, nextMonth))
+  }
+
+  /** Число в закреплённом месяце; время смены остаётся прежним. */
+  const pickDay = (day) => {
+    const date = new Date(changedAt)
+    date.setFullYear(year, month, day)
+    setChangedAt(toDateTimeInput(date))
   }
 
   const pickChangedAt = (localValue) => {
@@ -134,10 +171,10 @@ export function StatusPopover({
   const selectedPeriod = periodKey(year, month)
   // Статус месяца, который сейчас выбран в поповере.
   const periodStatus = statusByPeriod[selectedPeriod]?.status ?? null
-  const unchanged = draft === periodStatus
 
+  // Тот же статус сохранить можно: так переносят дату смены.
   const save = () => {
-    if (unchanged || !changedAt) return
+    if (saving || !changedAt) return
     onSave(draft, new Date(changedAt).toISOString(), selectedPeriod)
   }
 
@@ -156,11 +193,19 @@ export function StatusPopover({
   const arrowClass =
     'flex h-6 w-6 items-center justify-center rounded-lg text-ink-muted transition-colors focus-ring enabled:hover:bg-ink/6 enabled:hover:text-ink-soft disabled:opacity-35'
 
+  // Под ячейкой, а если не помещается — над ней; всегда в пределах экрана.
+  const placement = usePopoverPlacement(ref, anchor)
+
   return createPortal(
     <div
       ref={ref}
-      style={{ left, top: anchor.bottom + 8, width: WIDTH }}
-      className="fixed z-50 rounded-2xl border border-line bg-surface p-4 shadow-lift"
+      style={{
+        left,
+        top: placement.top,
+        width: WIDTH,
+        maxHeight: placement.maxHeight,
+      }}
+      className="fixed z-50 overflow-y-auto rounded-2xl border border-line bg-surface p-4 shadow-lift"
       onKeyDown={(e) => e.key === 'Enter' && save()}
     >
       <div className="flex items-start justify-between gap-3">
@@ -241,93 +286,122 @@ export function StatusPopover({
             })}
           </div>
 
-          <div className="mt-3">
-            <Field label="Дата изменения">
-              <Input
-                type="datetime-local"
+          {monthLocked ? (
+            <div className="mt-3">
+              <p className="mb-1.5 text-[13px] font-medium text-ink-soft">
+                Дата изменения
+              </p>
+              <MonthDays
+                year={year}
+                month={month}
                 value={changedAt}
-                onChange={(e) => pickChangedAt(e.target.value)}
-                className="h-9 text-[13px] tnum"
+                onPick={pickDay}
               />
-            </Field>
-          </div>
-
-          {/* Месяц договора, к которому относится статус: его вкладка в
-              фильтре окрасится зелёным или красным. */}
-          <div className="mt-3">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-[13px] font-medium text-ink-soft">Месяц</p>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  disabled={prevYear == null}
-                  onClick={() => pickMonth(prevYear, month)}
-                  aria-label="Предыдущий год"
-                  className={arrowClass}
-                >
-                  <ChevronLeft size={14} />
-                </button>
-                <span className="min-w-[38px] text-center text-[12px] font-semibold text-ink tnum">
-                  {year}
-                </span>
-                <button
-                  type="button"
-                  disabled={nextYear == null}
-                  onClick={() => pickMonth(nextYear, month)}
-                  aria-label="Следующий год"
-                  className={arrowClass}
-                >
-                  <ChevronRight size={14} />
-                </button>
+              <p className="mt-1.5 text-[11px] text-ink-muted">
+                {periodStatus
+                  ? `${MONTHS_FULL[month]} ${year}: ${byValue[periodStatus]?.label ?? periodStatus}`
+                  : `${MONTHS_FULL[month]} ${year}: статус не ставили`}
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="mt-3">
+                <Field label="Дата изменения">
+                  <Input
+                    type="datetime-local"
+                    value={changedAt}
+                    onChange={(e) => pickChangedAt(e.target.value)}
+                    className="h-9 text-[13px] tnum"
+                  />
+                </Field>
               </div>
-            </div>
 
-            <div className="mt-1.5 grid grid-cols-4 gap-1">
-              {MONTHS_SHORT.map((label, index) => {
-                const active = index === month
-                // У месяца уже есть статус — показываем точкой, какой именно.
-                const saved = statusByPeriod[periodKey(year, index)]?.status
-                return (
-                  <button
-                    key={label}
-                    type="button"
-                    onClick={() => pickMonth(year, index)}
-                    title={`${MONTHS_FULL[index]} ${year}`}
-                    className={cn(
-                      'flex items-center justify-center gap-1 rounded-lg border px-1 py-1.5 text-[12px] font-medium transition-colors focus-ring',
-                      active
-                        ? 'border-indigo-400 bg-indigo-50 text-ink'
-                        : 'border-line bg-surface text-ink-soft hover:border-indigo-200 hover:bg-indigo-50/50',
-                    )}
-                  >
-                    {label}
-                    {saved && (
-                      <span
+              {/* Месяц договора, к которому относится статус: его вкладка в
+                фильтре окрасится зелёным или красным. */}
+              <div className="mt-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[13px] font-medium text-ink-soft">Месяц</p>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      disabled={prevYear == null}
+                      onClick={() => pickMonth(prevYear, month)}
+                      aria-label="Предыдущий год"
+                      className={arrowClass}
+                    >
+                      <ChevronLeft size={14} />
+                    </button>
+                    <span className="min-w-[38px] text-center text-[12px] font-semibold text-ink tnum">
+                      {year}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={nextYear == null}
+                      onClick={() => pickMonth(nextYear, month)}
+                      aria-label="Следующий год"
+                      className={arrowClass}
+                    >
+                      <ChevronRight size={14} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-1.5 grid grid-cols-4 gap-1">
+                  {MONTHS_SHORT.map((label, index) => {
+                    const active = index === month
+                    // У месяца уже есть статус — показываем точкой, какой именно.
+                    const saved = statusByPeriod[periodKey(year, index)]?.status
+                    return (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={() => pickMonth(year, index)}
+                        title={`${MONTHS_FULL[index]} ${year}`}
                         className={cn(
-                          'h-1.5 w-1.5 shrink-0 rounded-full',
-                          saved === 'paid' ? 'bg-success' : 'bg-danger',
+                          'flex items-center justify-center gap-1 rounded-lg border px-1 py-1.5 text-[12px] font-medium transition-colors focus-ring',
+                          active
+                            ? 'border-indigo-400 bg-indigo-50 text-ink'
+                            : 'border-line bg-surface text-ink-soft hover:border-indigo-200 hover:bg-indigo-50/50',
                         )}
-                      />
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-            <p className="mt-1.5 text-[11px] text-ink-muted">
-              {periodStatus
-                ? `${MONTHS_FULL[month]} ${year}: ${byValue[periodStatus]?.label ?? periodStatus}`
-                : `${MONTHS_FULL[month]} ${year}: статус не ставили`}
-            </p>
-          </div>
+                      >
+                        {label}
+                        {saved && (
+                          <span
+                            className={cn(
+                              'h-1.5 w-1.5 shrink-0 rounded-full',
+                              byValue[saved]?.dot ??
+                                (saved === 'paid' ? 'bg-success' : 'bg-danger'),
+                            )}
+                          />
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+                <p className="mt-1.5 text-[11px] text-ink-muted">
+                  {periodStatus
+                    ? `${MONTHS_FULL[month]} ${year}: ${byValue[periodStatus]?.label ?? periodStatus}`
+                    : `${MONTHS_FULL[month]} ${year}: статус не ставили`}
+                </p>
+              </div>
+            </>
+          )}
 
           <div className="mt-4 flex gap-2">
             <Button
               size="sm"
               className="flex-1"
               onClick={save}
-              disabled={unchanged || !changedAt}
+              disabled={saving || !changedAt}
             >
-              Сохранить
+              {saving ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  Сохраняем…
+                </>
+              ) : (
+                'Сохранить'
+              )}
             </Button>
             <Button size="sm" variant="secondary" onClick={onClose}>
               Отмена

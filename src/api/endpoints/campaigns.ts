@@ -30,8 +30,9 @@ export function get(id: number): Promise<Campaign> {
 }
 
 /**
- * POST /campaigns — заявку заводит рекламодатель. Бренд сервер берёт из
- * сессии, статус ставит `sent`; в теле их не ждут.
+ * POST /campaigns — заявку заводит рекламодатель или площадка за бренд.
+ * Рекламодателю бренд сервер берёт из сессии и ставит статус `sent`;
+ * площадка присылает `advertiserId` обязательно — статус будет `received`.
  */
 export function create(input: CampaignInput): Promise<Campaign> {
   return request<Campaign>('/campaigns', { method: 'POST', body: input })

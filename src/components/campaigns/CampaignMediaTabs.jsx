@@ -1,5 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { Fragment, useEffect, useState } from 'react'
 import { Check, ChevronLeft, ChevronRight, Pencil, Plus, X } from 'lucide-react'
 import { uid } from '@/lib/id.js'
 import { cn } from '@/lib/cn.js'
@@ -7,6 +6,7 @@ import { useHorizontalScroll } from '@/lib/useHorizontalScroll.js'
 import { useAuth } from '@/features/auth/useAuth'
 import { useConfirm } from '@/components/ui/Confirm.jsx'
 import { useToast } from '@/components/ui/Toast.jsx'
+import { AnchoredPopover } from '@/components/ui/AnchoredPopover.jsx'
 
 // Категории и каналы, которые завёл пользователь: свой набор у каждого договора.
 const TABS_STORAGE_KEY = 'setanta.campaign.custom-tabs.v2'
@@ -18,22 +18,13 @@ const CAMPAIGN_TABS = [
 ]
 
 /**
- * Категории, которые добавляют руками. Эфиры, логи выходов, промо и
- * соцсети приходят листами из загруженного файла — их вкладки постоянные
- * (см. MediaReport). Руками остаётся только OTT: в файле его нет, и данные
- * живут в браузере, пока бэкенд их не примет.
+ * Категории, которые добавляют руками: { name, kind, hint, channels }.
+ * Сейчас их нет — эфиры, логи выходов, промо, соцсети и OTT приходят листами
+ * из загруженного файла, их вкладки постоянные (см. MediaReport). Пока список
+ * пуст, кнопка «Добавить категорию» не показывается, а сохранённые раньше
+ * категории (OTT из браузера) отбрасываются при чтении.
  */
-export const CATEGORY_PRESETS = [
-  {
-    name: 'OTT',
-    kind: 'log',
-    hint: 'Логи выходов Live spot и Preroll',
-    channels: [
-      { id: 'ott_live', label: 'Live spot' },
-      { id: 'ott_preroll', label: 'Preroll' },
-    ],
-  },
-]
+export const CATEGORY_PRESETS = []
 
 /** Категория с её каналами — из пресета по названию. */
 function categoryFromPreset(name, categoryId) {
@@ -173,8 +164,12 @@ export function CampaignTabs({
     canRight,
     scrollBy,
   } = useHorizontalScroll(value)
-  // Собирать отчёт может только площадка.
-  const canAdd = Boolean(onAddCategory) && canEdit && !isAdvertiser
+  // Собирать отчёт может только площадка — и только если есть что добавить.
+  const canAdd =
+    Boolean(onAddCategory) &&
+    canEdit &&
+    !isAdvertiser &&
+    CATEGORY_PRESETS.length > 0
   // Крестики у категорий показываем только в режиме правки — по карандашу.
   const [editing, setEditing] = useState(false)
 
@@ -193,29 +188,11 @@ export function CampaignTabs({
   useEffect(() => {
     if (editing && !groups.some((group) => group.id)) setEditing(false)
   }, [editing, groups])
-  // anchor — прямоугольник кнопки: меню рисуется порталом, лента прокручивается.
-  const [anchor, setAnchor] = useState(null)
-  const addRef = useRef(null)
-
-  const open = Boolean(anchor)
-  const close = () => setAnchor(null)
-
-  // Меню закрываем кликом вне и по Escape.
-  useEffect(() => {
-    if (!open) return
-    const onDown = (e) => {
-      if (addRef.current?.contains(e.target)) return
-      if (e.target.closest?.('[data-add-menu]')) return
-      close()
-    }
-    const onKey = (e) => e.key === 'Escape' && close()
-    document.addEventListener('mousedown', onDown)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('mousedown', onDown)
-      document.removeEventListener('keydown', onKey)
-    }
-  }, [open])
+  // Кнопка «+», от которой открыто меню; null — меню закрыто. Меню —
+  // AnchoredPopover: лента прокручивается, а он держится за кнопку.
+  const [anchorEl, setAnchorEl] = useState(null)
+  const open = Boolean(anchorEl)
+  const close = () => setAnchorEl(null)
 
   // Категории, которых ещё нет в отчёте.
   const freePresets = CATEGORY_PRESETS.filter(
@@ -243,12 +220,10 @@ export function CampaignTabs({
 
   const actionButtons = (
     <div className="flex shrink-0 items-center gap-1.5">
-      <div ref={addRef}>
+      <div>
         <button
           type="button"
-          onClick={(e) =>
-            setAnchor(open ? null : e.currentTarget.getBoundingClientRect())
-          }
+          onClick={(e) => setAnchorEl(open ? null : e.currentTarget)}
           aria-label="Добавить категорию"
           aria-expanded={open}
           title="Добавить категорию"
@@ -282,60 +257,55 @@ export function CampaignTabs({
     </div>
   )
 
-  const addMenu =
-    open &&
-    createPortal(
-      <div
-        data-add-menu
-        style={{
-          left: Math.min(anchor.left, window.innerWidth - 288),
-          top: anchor.bottom + 8,
-        }}
-        className="fixed z-50 w-72 rounded-2xl border border-line bg-surface p-4 shadow-lift"
-      >
-        <div className="flex items-start justify-between gap-3">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted">
-            Добавить категорию
-          </p>
-          <button
-            type="button"
-            onClick={close}
-            aria-label="Закрыть"
-            className="shrink-0 rounded-lg p-1 text-ink-muted transition-colors hover:bg-ink/6 hover:text-ink focus-ring"
-          >
-            <X size={15} />
-          </button>
-        </div>
+  const addMenu = open && (
+    <AnchoredPopover
+      anchorEl={anchorEl}
+      onClose={close}
+      width={288}
+      className="rounded-2xl p-4"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted">
+          Добавить категорию
+        </p>
+        <button
+          type="button"
+          onClick={close}
+          aria-label="Закрыть"
+          className="shrink-0 rounded-lg p-1 text-ink-muted transition-colors hover:bg-ink/6 hover:text-ink focus-ring"
+        >
+          <X size={15} />
+        </button>
+      </div>
 
-        <div className="mt-3 grid gap-1.5">
-          {freePresets.length ? (
-            freePresets.map((preset) => (
-              <button
-                key={preset.name}
-                type="button"
-                onClick={() => {
-                  close()
-                  onAddCategory(preset.name)
-                }}
-                className="rounded-xl border border-line bg-surface px-3 py-2 text-left transition-colors hover:border-indigo-300 hover:bg-indigo-50 focus-ring"
-              >
-                <span className="block text-[13px] font-medium text-ink">
-                  {preset.name}
-                </span>
-                <span className="block text-[11px] text-ink-muted">
-                  {preset.hint}
-                </span>
-              </button>
-            ))
-          ) : (
-            <p className="rounded-xl bg-paper/70 px-3 py-3 text-center text-[12px] text-ink-muted">
-              Все категории уже добавлены.
-            </p>
-          )}
-        </div>
-      </div>,
-      document.body,
-    )
+      <div className="mt-3 grid gap-1.5">
+        {freePresets.length ? (
+          freePresets.map((preset) => (
+            <button
+              key={preset.name}
+              type="button"
+              onClick={() => {
+                close()
+                onAddCategory(preset.name)
+              }}
+              className="rounded-xl border border-line bg-surface px-3 py-2 text-left transition-colors hover:border-indigo-300 hover:bg-indigo-50 focus-ring"
+            >
+              <span className="block text-[13px] font-medium text-ink">
+                {preset.name}
+              </span>
+              <span className="block text-[11px] text-ink-muted">
+                {preset.hint}
+              </span>
+            </button>
+          ))
+        ) : (
+          <p className="rounded-xl bg-paper/70 px-3 py-3 text-center text-[12px] text-ink-muted">
+            Все категории уже добавлены.
+          </p>
+        )}
+      </div>
+    </AnchoredPopover>
+  )
 
   return (
     // Лента крутится колесом прямо над блоками и стрелками по краям:

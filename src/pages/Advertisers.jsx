@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   Search,
@@ -27,6 +27,7 @@ import { EmptyState } from '@/components/ui/EmptyState.jsx'
 import { Loader } from '@/components/ui/Loader.jsx'
 import { FadeIn } from '@/components/ui/FadeIn.jsx'
 import { DropdownMenu } from '@/components/ui/DropdownMenu.jsx'
+import { AnchoredPopover } from '@/components/ui/AnchoredPopover.jsx'
 import { AdvertiserForm } from '@/components/forms/AdvertiserForm.jsx'
 import { SegmentTabs } from '@/components/ui/Tabs.jsx'
 import Users from '@/pages/Users.jsx'
@@ -266,27 +267,23 @@ const STATUS_DOTS = {
   muted: 'bg-ink-muted',
 }
 
-/** Бейдж статуса, который по клику превращается в выбор из двух значений. */
+/**
+ * Бейдж статуса, который по клику превращается в выбор значения. Меню —
+ * AnchoredPopover: карточка его не обрежет, у края экрана оно откроется вверх.
+ */
 function StatusMenu({ value, brand, onPick }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef(null)
+  // Бейдж, от которого открыто меню; null — меню закрыто.
+  const [anchorEl, setAnchorEl] = useState(null)
   const current = ADV_STATUS[value] ?? ADV_STATUS.active
 
-  useEffect(() => {
-    const close = (e) =>
-      ref.current && !ref.current.contains(e.target) && setOpen(false)
-    document.addEventListener('mousedown', close)
-    return () => document.removeEventListener('mousedown', close)
-  }, [])
-
   return (
-    <span className="relative shrink-0" ref={ref}>
+    <span className="shrink-0">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={(e) => setAnchorEl(anchorEl ? null : e.currentTarget)}
         title={`Статус бренда ${brand}`}
         aria-label={`Изменить статус бренда ${brand}`}
-        aria-expanded={open}
+        aria-expanded={!!anchorEl}
         className="focus-ring rounded-full"
       >
         <Badge tone={current.tone} dot className="cursor-pointer pr-2">
@@ -295,14 +292,18 @@ function StatusMenu({ value, brand, onPick }) {
         </Badge>
       </button>
 
-      {open && (
-        <span className="absolute left-0 top-full z-20 mt-1 flex w-44 flex-col overflow-hidden rounded-xl border border-line bg-surface p-1.5 text-left shadow-lift">
+      {anchorEl && (
+        <AnchoredPopover
+          anchorEl={anchorEl}
+          onClose={() => setAnchorEl(null)}
+          width={176}
+        >
           {Object.entries(ADV_STATUS).map(([key, meta]) => (
             <button
               key={key}
               type="button"
               onClick={() => {
-                setOpen(false)
+                setAnchorEl(null)
                 onPick(key)
               }}
               className={cn(
@@ -324,7 +325,7 @@ function StatusMenu({ value, brand, onPick }) {
               )}
             </button>
           ))}
-        </span>
+        </AnchoredPopover>
       )}
     </span>
   )

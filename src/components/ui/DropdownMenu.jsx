@@ -1,26 +1,24 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import { MoreHorizontal } from 'lucide-react'
+import { AnchoredPopover } from '@/components/ui/AnchoredPopover.jsx'
 import { cn } from '@/lib/cn.js'
 
 /**
+ * Меню «…». Открывается через AnchoredPopover: не обрезается карточкой,
+ * у края экрана само уходит вверх.
  * items: [{ label, icon, onClick, tone? }]
  */
 export function DropdownMenu({ items, trigger, align = 'right' }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef(null)
-
-  useEffect(() => {
-    const h = (e) =>
-      ref.current && !ref.current.contains(e.target) && setOpen(false)
-    document.addEventListener('mousedown', h)
-    return () => document.removeEventListener('mousedown', h)
-  }, [])
+  // Кнопка, от которой открыто меню; null — меню закрыто.
+  const [anchorEl, setAnchorEl] = useState(null)
+  const open = !!anchorEl
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={(e) => setAnchorEl(open ? null : e.currentTarget)}
+        aria-expanded={open}
         className={cn(
           'flex h-9 w-9 items-center justify-center rounded-lg text-ink-muted transition-colors hover:bg-ink/6 hover:text-ink focus-ring',
           open && 'bg-ink/6 text-ink',
@@ -30,18 +28,18 @@ export function DropdownMenu({ items, trigger, align = 'right' }) {
       </button>
 
       {open && (
-        <div
-          className={cn(
-            'absolute top-full z-20 mt-1 w-44 overflow-hidden rounded-xl border border-line bg-surface p-1.5 shadow-lift',
-            align === 'right' ? 'right-0' : 'left-0',
-          )}
+        <AnchoredPopover
+          anchorEl={anchorEl}
+          onClose={() => setAnchorEl(null)}
+          align={align}
+          width={176}
         >
           {items.map((it, i) => (
             <button
               key={i}
               type="button"
               onClick={() => {
-                setOpen(false)
+                setAnchorEl(null)
                 it.onClick()
               }}
               className={cn(
@@ -55,7 +53,7 @@ export function DropdownMenu({ items, trigger, align = 'right' }) {
               {it.label}
             </button>
           ))}
-        </div>
+        </AnchoredPopover>
       )}
     </div>
   )

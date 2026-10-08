@@ -9,10 +9,84 @@ import { Card } from '@/components/ui/Card.jsx'
 import { formatNumber } from '@/lib/format.js'
 import { cn } from '@/lib/cn.js'
 
+// Блок выходов ролика в эфире — так он подписан в файле.
+const SPOTS_GROUP = 'Live ads spots for 1 brand'
+
+// Бренды, чьи ролики шли в эфире, — блок справа, как в файле. Колонки
+// заводят руками, не больше восьми.
+const BRANDS_GROUP = 'Total ads spots'
+const MAX_BRANDS = 8
+const brandKey = (n) => `brand${n}`
+
+/** Колонки брендов 1…count. `brand` — номер бренда. */
+const brandColumns = (count) =>
+  Array.from({ length: count }, (_, i) => ({
+    key: brandKey(i + 1),
+    label: `Brand ${i + 1}`,
+    type: 'text',
+    brand: i + 1,
+    group: BRANDS_GROUP,
+  }))
+
+/**
+ * Сколько колонок брендов заведено: по самой дальней. Заведённая колонка
+ * есть в каждой строке — хотя бы пустой строкой.
+ */
+const countBrands = (rows) =>
+  rows.reduce((max, row) => {
+    for (let n = MAX_BRANDS; n > max; n -= 1) {
+      if (row[brandKey(n)] !== undefined) return n
+    }
+    return max
+  }, 0)
+
+/** Строка с полями брендов 1…count: недостающие — пустые. */
+const withBrands = (row, count) => {
+  const next = { ...row }
+  for (let n = 1; n <= count; n += 1) {
+    if (next[brandKey(n)] === undefined) next[brandKey(n)] = ''
+  }
+  return next
+}
+
+/** Выход ролика в эфире: секунды, пусто — выхода не было («-» в файле). */
+const spot = (key, label) => ({
+  key,
+  label,
+  type: 'number',
+  spot: true,
+  nullable: true,
+  group: SPOTS_GROUP,
+})
+
+// Прямой эфир: Live spot SS1/SS2, а без post — OTT (LIVE).
+const LIVE_COLUMNS = [
+  { key: 'date', label: 'Date', type: 'date', accent: true },
+  { key: 'time', label: 'Time', type: 'time', accent: true },
+  { key: 'tournament', label: 'Tournament', type: 'text' },
+  // Event уже, чтобы место досталось блоку выходов.
+  { key: 'event', label: 'Event', type: 'text', width: 'w-[220px]' },
+  spot('pre', 'pre'),
+  spot('mid1', 'mid'),
+  spot('mid2', 'mid'),
+  spot('post', 'post'),
+  {
+    key: 'views',
+    label: 'Views',
+    type: 'number',
+    nullable: true,
+    group: SPOTS_GROUP,
+  },
+]
+
 /**
  * Колонки по форме листа. Таблицу выбираем по `kind`, а не по коду листа:
- * логов выходов четыре, эфиров два, соцсеть одна — форм всего три.
+ * логов выходов четыре, эфиров два — форм всего пять.
  * `accent` — дата и время выхода, их красим так же, как в файле.
+ * `group` — общая подпись над колонками во второй строке шапки.
+ * `nullable` — пустое число остаётся пустым, а не становится нулём.
+ * `width` — своя ширина текстовой колонки; без неё колонка тянется.
+ * Колонки брендов у эфиров добавляются к этим отдельно — см. brandColumns.
  */
 const COLUMNS = {
   spot_log: [
@@ -20,11 +94,15 @@ const COLUMNS = {
     { key: 'date', label: 'Date', type: 'date', accent: true },
     { key: 'time', label: 'Time', type: 'time', accent: true },
   ],
-  live_event: [
-    { key: 'date', label: 'Date', type: 'date', accent: true },
-    { key: 'time', label: 'Time', type: 'time', accent: true },
-    { key: 'tournament', label: 'Tournament', type: 'text' },
-    { key: 'event', label: 'Event', type: 'text' },
+  live_event: LIVE_COLUMNS,
+  ott_live: LIVE_COLUMNS.filter((column) => column.key !== 'post'),
+  // Прероллы OTT: процент, число прероллов и период — в файле он одной
+  // ячейкой «01/09/2026-30/09/2026», в API — двумя датами.
+  preroll: [
+    { key: 'percent', label: '%', type: 'percent' },
+    { key: 'prerolls', label: 'Prerolls', type: 'number' },
+    { key: 'dateFrom', label: 'с', type: 'date', accent: true, group: 'Date' },
+    { key: 'dateTo', label: 'по', type: 'date', accent: true, group: 'Date' },
   ],
   social: [
     { key: 'link', label: 'Ссылка', type: 'text' },
@@ -35,9 +113,60 @@ const COLUMNS = {
 /** Пустая строка для «Добавить строку» — по форме листа. */
 const EMPTY_ROW = {
   spot_log: () => ({ item: '', date: '', time: '' }),
-  live_event: () => ({ date: '', time: '', tournament: '', event: '' }),
+  live_event: () => ({
+    date: '',
+    time: '',
+    tournament: '',
+    event: '',
+    pre: null,
+    mid1: null,
+    mid2: null,
+    post: null,
+    views: null,
+  }),
+  // Новые поля выходов сервер требует и у новых строк — пустыми, null.
+  ott_live: () => ({
+    date: '',
+    time: '',
+    tournament: '',
+    event: '',
+    pre: null,
+    mid1: null,
+    mid2: null,
+    views: null,
+  }),
+  preroll: () => ({ percent: '', prerolls: 0, dateFrom: '', dateTo: '' }),
   social: (network) => ({ network, link: '', impressions: 0 }),
 }
+
+/**
+ * Соседние элементы с одинаковым ключом — одной ячейкой шапки: так группа
+ * встаёт над своими колонками, а две «mid» сливаются в одну, как в файле.
+ * Ключ null не сливается ни с чем.
+ */
+const mergeSpans = (columns, keyOf) =>
+  columns.reduce((spans, column) => {
+    const last = spans[spans.length - 1]
+    const key = keyOf(column)
+    if (last && key !== null && keyOf(last.column) === key) last.span += 1
+    else spans.push({ column, span: 1 })
+    return spans
+  }, [])
+
+/** Класс ячейки шапки по колонке. */
+const headClass = (column, span = 1) =>
+  cn(
+    'border-l border-black/10 px-3',
+    column.accent
+      ? 'w-[130px] bg-[#ff665f]/90 text-center'
+      : column.spot
+        ? cn('text-center', span > 1 ? 'w-32' : 'w-16')
+        : column.brand
+          ? 'min-w-[140px] text-center'
+          : column.type === 'number' || column.type === 'percent'
+            ? 'w-[140px] text-right'
+            : cn('text-left', column.width),
+  )
 
 // Соцсети в листе идут блоками: сначала Instagram, потом Telegram.
 const NETWORK_ORDER = ['instagram', 'telegram']
@@ -45,6 +174,8 @@ const NETWORK_ORDER = ['instagram', 'telegram']
 const EYEBROW = {
   spot_log: 'Broadcast log',
   live_event: 'Live events',
+  ott_live: 'OTT live',
+  preroll: 'OTT preroll',
   social: 'Social media report',
 }
 
@@ -62,13 +193,71 @@ function display(column, value) {
   if (value === '' || value === null || value === undefined) return '—'
   if (column.type === 'date') return isoToRu(value)
   if (column.type === 'number') return formatNumber(value)
+  if (column.type === 'percent') return formatPercent(value)
   return value
 }
 
-/** Число из поля: пустое — ноль, всё лишнее отбрасываем. */
-const toCount = (value) => {
+// Процент — до сотых, как его хранит сервер: 4,99.
+const formatPercent = (value) =>
+  Number(value).toLocaleString('ru-RU', { maximumFractionDigits: 2 })
+
+/**
+ * Процент в поле правки: цифры и одна точка, не больше двух знаков после
+ * неё. В черновике он строкой — иначе «4.» превращалось бы в 4 прямо
+ * при наборе; числом становится перед отправкой (см. toPercent).
+ */
+const toPercentInput = (value) => {
+  const [whole, ...rest] = String(value)
+    .replace(/,/g, '.')
+    .replace(/[^\d.]/g, '')
+    .split('.')
+  return rest.length ? `${whole}.${rest.join('').slice(0, 2)}` : whole
+}
+
+/** Процент из черновика → число для сервера; пусто — null. */
+const toPercent = (value) => {
+  const text = String(value ?? '').trim()
+  if (!text) return null
+  const number = Number(text)
+  return Number.isFinite(number) ? number : null
+}
+
+/**
+ * Число из поля: всё лишнее отбрасываем. Пустое — ноль, а у необязательных
+ * колонок остаётся пустым (null).
+ */
+const toCount = (value, nullable = false) => {
   const digits = String(value ?? '').replace(/[^\d]/g, '')
-  return digits ? Number(digits) : 0
+  if (!digits) return nullable ? null : 0
+  return Number(digits)
+}
+
+/** Значение числовой ячейки в поле правки. */
+const editValue = (column, value) =>
+  column.nullable && (value === null || value === undefined)
+    ? ''
+    : formatNumber(value)
+
+/**
+ * Итоги эфиров по строкам — так же, как их считает сервер (`totals`):
+ * пустое значение — ноль, `seconds` — сумма всех колонок выходов.
+ */
+const liveTotals = (rows, spotKeys) => {
+  const sum = (key) =>
+    rows.reduce((total, row) => total + (Number(row[key]) || 0), 0)
+  const totals = { rows: rows.length, views: sum('views'), seconds: 0 }
+  for (const key of spotKeys) {
+    totals[key] = sum(key)
+    totals.seconds += totals[key]
+  }
+  return totals
+}
+
+// Блоки красим, как в файле: выходы — красным (как дата и время в шапке),
+// бренды — зелёным.
+const GROUP_CELL = {
+  [SPOTS_GROUP]: 'border-white/50 bg-[#ff665f]/90',
+  [BRANDS_GROUP]: 'border-white/50 bg-[#84c450]/90',
 }
 
 /**
@@ -82,45 +271,70 @@ const EditRow = memo(function EditRow({
   errors,
   onChange,
   onRemove,
+  onInsert,
 }) {
   return (
-    <tr className={index % 2 ? 'bg-paper/35' : 'bg-surface'}>
-      <td className="px-2 py-1.5 text-center text-[11px] text-ink-muted tnum">
+    <tr className={cn('group', index % 2 ? 'bg-paper/35' : 'bg-surface')}>
+      <td className="relative px-2 py-1.5 text-center text-[11px] text-ink-muted tnum">
         {index + 1}
+        {/* «+» на нижней границе строки: вставляет пустую строку под ней. */}
+        <button
+          type="button"
+          onClick={() => onInsert(index)}
+          aria-label={`Добавить строку после ${index + 1}`}
+          title="Добавить строку ниже"
+          className="absolute -bottom-2.5 left-1/2 z-[5] flex size-5 -translate-x-1/2 items-center justify-center rounded-full bg-indigo-500 text-ink opacity-0 shadow-sm transition-opacity group-hover:opacity-100 hover:scale-110 focus-visible:opacity-100 focus-ring"
+        >
+          <Plus size={12} strokeWidth={3} />
+        </button>
       </td>
       {columns.map((column) => {
         const error = errors?.[column.key]
         return (
-          <td key={column.key} className="border-l border-line px-1.5 py-1">
+          <td
+            key={column.key}
+            className={cn(
+              'border-l border-line px-1.5 py-1',
+              GROUP_CELL[column.group],
+            )}
+          >
             <input
               type={
-                column.type === 'number'
+                ['number', 'percent', 'text'].includes(column.type)
                   ? 'text'
-                  : column.type === 'text'
-                    ? 'text'
-                    : column.type
+                  : column.type
               }
               // Время с секундами: так оно записано в файле.
               step={column.type === 'time' ? 1 : undefined}
-              inputMode={column.type === 'number' ? 'numeric' : undefined}
+              inputMode={
+                column.type === 'number'
+                  ? 'numeric'
+                  : column.type === 'percent'
+                    ? 'decimal'
+                    : undefined
+              }
               value={
                 column.type === 'number'
-                  ? formatNumber(row[column.key])
+                  ? editValue(column, row[column.key])
                   : (row[column.key] ?? '')
               }
+              placeholder={column.nullable ? '—' : undefined}
               onChange={(e) =>
                 onChange(
                   index,
                   column.key,
                   column.type === 'number'
-                    ? toCount(e.target.value)
-                    : e.target.value,
+                    ? toCount(e.target.value, column.nullable)
+                    : column.type === 'percent'
+                      ? toPercentInput(e.target.value)
+                      : e.target.value,
                 )
               }
               aria-invalid={!!error}
               title={error}
               className={cn(
                 'w-full rounded-lg border bg-surface px-2 py-1 text-[13px] text-ink outline-hidden transition-colors tnum focus:ring-2',
+                (column.spot || column.brand) && 'text-center',
                 error
                   ? 'border-danger focus:border-danger focus:ring-danger/20'
                   : 'border-line focus:border-indigo-400 focus:ring-indigo-200',
@@ -166,8 +380,9 @@ export function ReportSheetTable({
   const toast = useToast()
   const { mutate: saveSheet, isPending: saving } = useSaveReportSheet()
 
-  const columns = COLUMNS[sheet.kind]
   const isSocial = sheet.kind === 'social'
+  // Бренды «Total ads spots» заводят только у эфиров: Live spot и OTT.
+  const isLive = sheet.kind === 'live_event' || sheet.kind === 'ott_live'
 
   // Строки этой вкладки: у соцсети — только своей сети.
   const rows = useMemo(
@@ -184,6 +399,12 @@ export function ReportSheetTable({
   const [cellErrors, setCellErrors] = useState({})
   const editing = draft !== null
   const shown = editing ? draft : rows
+
+  const brandCount = isLive ? countBrands(shown) : 0
+  const columns = useMemo(
+    () => [...COLUMNS[sheet.kind], ...brandColumns(brandCount)],
+    [sheet.kind, brandCount],
+  )
 
   // Сменили лист или месяц — незаконченную правку не тащим за собой.
   useEffect(() => {
@@ -209,8 +430,22 @@ export function ReportSheetTable({
     setCellErrors({})
   }, [])
 
+  const insertAfter = useCallback(
+    (index) => {
+      setDraft((current) => [
+        ...current.slice(0, index + 1),
+        withBrands(EMPTY_ROW[sheet.kind](network), countBrands(current)),
+        ...current.slice(index + 1),
+      ])
+      // Индексы ниже вставки съехали — ошибки к ним уже не относятся.
+      setCellErrors({})
+    },
+    [sheet.kind, network],
+  )
+
   const startEditing = () => {
-    setDraft(rows.map((row) => ({ ...row })))
+    const count = countBrands(rows)
+    setDraft(rows.map((row) => withBrands(row, count)))
     setCellErrors({})
   }
 
@@ -220,7 +455,35 @@ export function ReportSheetTable({
   }
 
   const addRow = () =>
-    setDraft((current) => [...current, EMPTY_ROW[sheet.kind](network)])
+    setDraft((current) => [
+      ...current,
+      withBrands(EMPTY_ROW[sheet.kind](network), countBrands(current)),
+    ])
+
+  /** Новая колонка бренда — пустая ячейка в каждой строке. */
+  const addBrand = () =>
+    setDraft((current) => {
+      const count = countBrands(current)
+      if (count >= MAX_BRANDS) return current
+      return current.map((row) => withBrands(row, count + 1))
+    })
+
+  /** Убрать колонку бренда: колонки правее съезжают на её место. */
+  const removeBrand = (n) => {
+    setDraft((current) => {
+      const count = countBrands(current)
+      return current.map((row) => {
+        const next = { ...row }
+        for (let k = n; k < count; k += 1) {
+          next[brandKey(k)] = row[brandKey(k + 1)] ?? ''
+        }
+        delete next[brandKey(count)]
+        return next
+      })
+    })
+    // Ошибки привязаны к колонкам — после сдвига они уже не о тех ячейках.
+    setCellErrors({})
+  }
 
   /**
    * Весь лист в порядке файла. У соцсети сети идут блоками — правленая
@@ -255,8 +518,21 @@ export function ReportSheetTable({
     return result
   }
 
+  // Проценты в черновике — строки, как их набрали; серверу — числа.
+  const percentKeys = columns
+    .filter((column) => column.type === 'percent')
+    .map((column) => column.key)
+  const toPayload = (edited) =>
+    percentKeys.length
+      ? edited.map((row) => {
+          const next = { ...row }
+          for (const key of percentKeys) next[key] = toPercent(row[key])
+          return next
+        })
+      : edited
+
   const save = () => {
-    const { all, offset } = buildRows(draft)
+    const { all, offset } = buildRows(toPayload(draft))
     saveSheet(
       {
         contractId,
@@ -296,6 +572,28 @@ export function ReportSheetTable({
     ? shown.reduce((sum, row) => sum + (Number(row.impressions) || 0), 0)
     : 0
 
+  // Шапка в две строки, если у колонок есть общая подпись группы.
+  const grouped = columns.some((column) => column.group)
+  // Итоги эфиров — строка «Итого» файла: сумма секунд по колонкам выходов,
+  // просмотры и весь хронометраж. Колонки выходов идут подряд,
+  // сразу за ними — Views.
+  const firstSpot = columns.findIndex((column) => column.spot)
+  const spotKeys = columns
+    .filter((column) => column.spot)
+    .map((column) => column.key)
+  const hasViews = columns.some((column) => column.key === 'views')
+  // После выходов: Views (если есть), бренды и колонка удаления при правке.
+  const afterSpots =
+    columns.length - firstSpot - spotKeys.length + (editing ? 1 : 0)
+  const totals =
+    firstSpot < 0
+      ? null
+      : // В просмотре — серверные `totals` листа; при правке их ещё нет —
+        // считаем по черновику так же, как сервер: пустое значение — ноль.
+        !editing && sheet.totals && 'seconds' in sheet.totals
+        ? sheet.totals
+        : liveTotals(shown, spotKeys)
+
   return (
     <Card className="relative overflow-hidden">
       <div className="flex flex-col gap-4 border-b border-line bg-linear-to-br from-surface via-indigo-50 to-indigo-100 p-5 sm:flex-row sm:items-center sm:justify-between">
@@ -317,6 +615,26 @@ export function ReportSheetTable({
                   <Plus size={15} />
                   Добавить строку
                 </Button>
+                {isLive && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={addBrand}
+                    disabled={!draft.length || brandCount >= MAX_BRANDS}
+                    title={
+                      !draft.length
+                        ? 'Сначала добавьте строку'
+                        : brandCount >= MAX_BRANDS
+                          ? `Не больше ${MAX_BRANDS} брендов`
+                          : 'Добавить колонку бренда в Total ads spots'
+                    }
+                  >
+                    <Plus size={15} />
+                    {brandCount
+                      ? `Добавить бренд · ${brandCount}/${MAX_BRANDS}`
+                      : 'Total ads spots'}
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   variant="secondary"
@@ -374,24 +692,67 @@ export function ReportSheetTable({
         <table className="w-full border-collapse text-sm">
           <thead className="sticky top-0 z-10">
             <tr className="bg-indigo-500 text-[11px] font-semibold uppercase tracking-wider text-ink">
-              <th className="w-12 px-2 py-3 text-center">№</th>
-              {columns.map((column) => (
-                <th
-                  key={column.key}
-                  className={cn(
-                    'border-l border-black/10 px-3 py-3',
-                    column.accent
-                      ? 'w-[130px] bg-[#ff665f]/90 text-center'
-                      : column.type === 'number'
-                        ? 'w-[160px] text-right'
-                        : 'text-left',
-                  )}
-                >
-                  {column.label}
-                </th>
-              ))}
-              {editing && <th className="w-10" />}
+              <th
+                rowSpan={grouped ? 2 : undefined}
+                className="w-12 px-2 py-3 text-center"
+              >
+                №
+              </th>
+              {mergeSpans(columns, (column) => column.group ?? null).map(
+                ({ column, span }) =>
+                  column.group ? (
+                    <th
+                      key={column.group}
+                      colSpan={span}
+                      className="border-b border-l border-black/10 px-3 py-2 text-center"
+                    >
+                      {column.group}
+                    </th>
+                  ) : (
+                    <th
+                      key={column.key}
+                      rowSpan={grouped ? 2 : undefined}
+                      className={cn(headClass(column), 'py-3')}
+                    >
+                      {column.label}
+                    </th>
+                  ),
+              )}
+              {editing && (
+                <th rowSpan={grouped ? 2 : undefined} className="w-10" />
+              )}
             </tr>
+            {grouped && (
+              <tr className="bg-indigo-500 text-[11px] font-semibold uppercase tracking-wider text-ink">
+                {mergeSpans(
+                  columns.filter((column) => column.group),
+                  (column) => column.label,
+                ).map(({ column, span }) => (
+                  <th
+                    key={column.key}
+                    colSpan={span}
+                    className={cn(headClass(column, span), 'py-2')}
+                  >
+                    {column.brand && editing ? (
+                      <span className="inline-flex items-center gap-1">
+                        {column.label}
+                        <button
+                          type="button"
+                          onClick={() => removeBrand(column.brand)}
+                          aria-label={`Убрать колонку ${column.label}`}
+                          title="Убрать колонку"
+                          className="rounded p-0.5 opacity-60 transition-opacity hover:bg-black/10 hover:opacity-100 focus-ring"
+                        >
+                          <X size={12} />
+                        </button>
+                      </span>
+                    ) : (
+                      column.label
+                    )}
+                  </th>
+                ))}
+              </tr>
+            )}
           </thead>
           <tbody className="divide-y divide-line">
             {!shown.length && (
@@ -425,6 +786,7 @@ export function ReportSheetTable({
                     errors={cellErrors[index]}
                     onChange={change}
                     onRemove={remove}
+                    onInsert={insertAfter}
                   />
                 ))
               : shown.map((row, index) => (
@@ -444,7 +806,13 @@ export function ReportSheetTable({
                         className={cn(
                           'border-l border-line px-3 py-2 text-[13px] text-ink',
                           column.accent && 'text-center tnum',
-                          column.type === 'number' && 'text-right tnum',
+                          column.spot
+                            ? 'text-center tnum'
+                            : (column.type === 'number' ||
+                                column.type === 'percent') &&
+                                'text-right tnum',
+                          column.brand && 'text-center',
+                          GROUP_CELL[column.group],
                           column.key === 'link' && 'max-w-0 truncate',
                         )}
                         title={column.key === 'link' ? row.link : undefined}
@@ -466,6 +834,57 @@ export function ReportSheetTable({
                   </tr>
                 ))}
           </tbody>
+          {totals && shown.length > 0 && (
+            <tfoot className="sticky bottom-0 z-10 bg-paper text-[13px] font-semibold text-ink tnum">
+              <tr className="border-t border-line">
+                <td
+                  colSpan={firstSpot + 1}
+                  className="px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-ink-muted"
+                >
+                  Сумма секунд
+                </td>
+                {spotKeys.map((key) => (
+                  <td
+                    key={key}
+                    className="border-l border-line px-2 py-2 text-center"
+                  >
+                    {formatNumber(totals[key])}
+                  </td>
+                ))}
+                {hasViews && (
+                  <td className="border-l border-line px-3 py-2 text-right">
+                    <span className="block whitespace-nowrap text-[10px] font-medium uppercase tracking-wider text-ink-muted">
+                      Сумма просмотров
+                    </span>
+                    {formatNumber(totals.views)}
+                  </td>
+                )}
+                {afterSpots - (hasViews ? 1 : 0) > 0 && (
+                  <td
+                    colSpan={afterSpots - (hasViews ? 1 : 0)}
+                    className="border-l border-line"
+                  />
+                )}
+              </tr>
+              <tr className="border-t border-line">
+                <td
+                  colSpan={firstSpot + 1}
+                  className="px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-ink-muted"
+                >
+                  Итого секунд
+                </td>
+                <td
+                  colSpan={spotKeys.length}
+                  className="border-l border-line px-2 py-2 text-center"
+                >
+                  {formatNumber(totals.seconds)}
+                </td>
+                {afterSpots > 0 && (
+                  <td colSpan={afterSpots} className="border-l border-line" />
+                )}
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
 

@@ -69,6 +69,8 @@ const arrowClass =
  * клик по выбранному месяцу).
  * years: доступные годы, counts: сколько кампаний попадает в каждый месяц,
  * statuses: { [месяц]: 'paid' | 'awaiting' } — статус оплаты договора за месяц.
+ * statusTitles: подписи этих статусов в подсказке вкладки.
+ * statusFills: свой цвет вкладки для статуса — поверх STATUS_FILLS.
  * resetLabel: что делает крестик — страницы трактуют сброс по-разному.
  */
 export function MonthTabs({
@@ -79,6 +81,8 @@ export function MonthTabs({
   onChange,
   counts,
   statuses,
+  statusTitles = { paid: 'оплачен', awaiting: 'ожидает оплату' },
+  statusFills,
   resetLabel = 'Показать все месяцы',
   className,
 }) {
@@ -142,8 +146,7 @@ export function MonthTabs({
                 passed
                   ? cn(
                       `${MONTHS_FULL[month]} ${year}`,
-                      status === 'paid' && '· оплачен',
-                      status === 'awaiting' && '· ожидает оплату',
+                      status && `· ${statusTitles[status]}`,
                     )
                   : `${MONTHS_FULL[month]} ${year} — месяц ещё не наступил`
               }
@@ -152,7 +155,7 @@ export function MonthTabs({
                 'flex shrink-0 items-center gap-1 rounded-lg px-2 py-1.5 text-[13px] font-medium transition-all focus-ring',
                 passed
                   ? status
-                    ? STATUS_FILLS[status]
+                    ? (statusFills?.[status] ?? STATUS_FILLS[status])
                     : cn(
                         MONTH_FILLS[month],
                         'text-indigo-900 hover:brightness-[0.97]',

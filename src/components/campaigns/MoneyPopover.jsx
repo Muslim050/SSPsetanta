@@ -11,8 +11,10 @@ import {
 import { Button } from '@/components/ui/Button'
 import { Field, Input } from '@/components/ui/Field'
 import { cn } from '@/lib/cn.js'
+import { usePopoverPlacement } from '@/lib/usePopoverPlacement.js'
 
-const WIDTH = 300
+// Шире прежних 300px: в истории выплат дата со временем иначе обрезается.
+const WIDTH = 380
 
 // В полях суммы показываем разряды: 200000000 → «200 000 000».
 const onlyDigits = (value) => String(value ?? '').replace(/\D/g, '')
@@ -151,13 +153,18 @@ export function MoneyPopover({
       // Дату и время поступления выбирает пользователь.
       paidAt: new Date(paidAt).toISOString(),
     })
-    setIncome('')
+    // Поле поступления не чистим: после сохранения поповер закрывается,
+    // а при ошибке сумма нужна для повтора.
   }
 
+  // Под ячейкой, а если не помещается — над ней; всегда в пределах экрана.
+  const placement = usePopoverPlacement(ref, anchor)
+  // На узком экране — во всю ширину с отступами по 12px.
+  const width = Math.min(WIDTH, window.innerWidth - 24)
   // Прижимаем к правому краю ячейки, но не даём уехать за экран.
   const left = Math.min(
-    Math.max(12, anchor.right - WIDTH),
-    window.innerWidth - WIDTH - 12,
+    Math.max(12, anchor.right - width),
+    window.innerWidth - width - 12,
   )
 
   const tabClass = (value) =>
@@ -171,8 +178,13 @@ export function MoneyPopover({
   return createPortal(
     <div
       ref={ref}
-      style={{ left, top: anchor.bottom + 8, width: WIDTH }}
-      className="fixed z-50 rounded-2xl border border-line bg-surface p-4 shadow-lift"
+      style={{
+        left,
+        top: placement.top,
+        width,
+        maxHeight: placement.maxHeight,
+      }}
+      className="fixed z-50 overflow-y-auto rounded-2xl border border-line bg-surface p-4 shadow-lift"
       onKeyDown={(e) => e.key === 'Enter' && save()}
     >
       <div className="flex items-start justify-between gap-3">

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Building2,
   CalendarRange,
@@ -27,6 +27,7 @@ import {
 import { Modal } from '@/components/ui/Modal.jsx'
 import { Button } from '@/components/ui/Button'
 import { Progress } from '@/components/ui/Progress.jsx'
+import { AnchoredPopover } from '@/components/ui/AnchoredPopover.jsx'
 import { ContractTile } from '@/components/campaigns/CampaignPreviewModal.jsx'
 import { cn } from '@/lib/cn.js'
 import { advertiserLogo } from '@/features/advertisers/logo'
@@ -50,32 +51,29 @@ const PILLS = {
 /**
  * Карточка договора: те же плитки, что и в карточке кампании, но условия
  * берём из самого договора. Правки живут в ContractModal — здесь только чтение.
+ * `showBudget={false}` прячет плитку бюджета с историей выплат — так окно
+ * открывается во вкладке «Договоры» рекламодателя, где денег нет.
  */
-export function ContractPreviewModal({ contract, advertiser, onClose }) {
+export function ContractPreviewModal({
+  contract,
+  advertiser,
+  onClose,
+  showBudget = true,
+}) {
   const { canEdit, isAdvertiser } = useAuth()
   // const { update } = useData()
   const { mutate: updateContract } = useUpdateContract()
   const toast = useToast()
   const [showPayments, setShowPayments] = useState(false)
-  const [statusOpen, setStatusOpen] = useState(false)
-  const statusRef = useRef(null)
+  // Кнопка статуса, от которой открыт выбор; null — выбор закрыт.
+  const [statusAnchor, setStatusAnchor] = useState(null)
 
   // Статус договора ведёт площадка: рекламодателю он только показывается.
   const canEditStatus = canEdit && !isAdvertiser
   const status = contract?.status ?? 'active'
 
-  // Клик мимо списка статусов — закрываем его.
-  useEffect(() => {
-    const h = (e) =>
-      statusRef.current &&
-      !statusRef.current.contains(e.target) &&
-      setStatusOpen(false)
-    document.addEventListener('mousedown', h)
-    return () => document.removeEventListener('mousedown', h)
-  }, [])
-
   const setStatus = (next) => {
-    setStatusOpen(false)
+    setStatusAnchor(null)
     if (next === status) return
     updateContract(
       { id: contract.id, input: { status: next } },
@@ -93,7 +91,7 @@ export function ContractPreviewModal({ contract, advertiser, onClose }) {
   // Открыли другой договор — историю снова прячем.
   useEffect(() => {
     setShowPayments(false)
-    setStatusOpen(false)
+    setStatusAnchor(null)
   }, [contract?.id])
 
   // Суммы приходят decimal-строками — в расчётах они нужны числами.
@@ -176,11 +174,13 @@ export function ContractPreviewModal({ contract, advertiser, onClose }) {
                 </p>
               </div>
               {/* Статус договора: площадка меняет его прямо из карточки. */}
-              <div className="relative shrink-0" ref={statusRef}>
+              <div className="relative shrink-0">
                 <button
                   type="button"
                   disabled={!canEditStatus}
-                  onClick={() => setStatusOpen((v) => !v)}
+                  onClick={(e) =>
+                    setStatusAnchor(statusAnchor ? null : e.currentTarget)
+                  }
                   title={
                     canEditStatus
                       ? 'Изменить статус договора'
@@ -206,8 +206,13 @@ export function ContractPreviewModal({ contract, advertiser, onClose }) {
                   )}
                 </button>
 
-                {statusOpen && (
-                  <div className="absolute right-0 top-full z-20 mt-1 w-48 overflow-hidden rounded-xl border border-line bg-surface p-1.5 shadow-lift">
+                {statusAnchor && (
+                  <AnchoredPopover
+                    anchorEl={statusAnchor}
+                    onClose={() => setStatusAnchor(null)}
+                    align="right"
+                    width={192}
+                  >
                     {Object.entries(CONTRACT_STATUS).map(([key, meta]) => (
                       <button
                         key={key}
@@ -232,7 +237,7 @@ export function ContractPreviewModal({ contract, advertiser, onClose }) {
                         )}
                       </button>
                     ))}
-                  </div>
+                  </AnchoredPopover>
                 )}
               </div>
             </div>
@@ -244,35 +249,37 @@ export function ContractPreviewModal({ contract, advertiser, onClose }) {
             ))}
 
             {/* Плитка оплаты: по клику раскрывается история выплат. */}
-            <button
-              type="button"
-              onClick={() => setShowPayments((v) => !v)}
-              title="История выплат"
-              className="group rounded-2xl border border-line bg-paper/55 p-4 text-left transition-colors hover:border-indigo-300 hover:bg-indigo-50 focus-ring"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-[11px] font-medium uppercase tracking-wider text-ink-muted">
-                  {isAdvertiser ? 'Бюджет / Оплачено' : 'Освоение бюджета'}
-                </span>
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-indigo-900 transition-transform group-hover:scale-105">
-                  <Gauge size={16} />
-                </span>
-              </div>
-              <p className="mt-3 flex items-baseline gap-1.5 text-[15px] font-semibold text-ink tnum">
-                {formatMoneyCompact(spent)}
-                <span className="text-[12px] font-medium text-ink-muted">
-                  из {formatMoneyCompact(budget)}
-                </span>
-              </p>
-              <Progress
-                value={pacing}
-                label={formatPct(pacing, 0)}
-                className="mt-2"
-              />
-            </button>
+            {showBudget && (
+              <button
+                type="button"
+                onClick={() => setShowPayments((v) => !v)}
+                title="История выплат"
+                className="group rounded-2xl border border-line bg-paper/55 p-4 text-left transition-colors hover:border-indigo-300 hover:bg-indigo-50 focus-ring"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[11px] font-medium uppercase tracking-wider text-ink-muted">
+                    {isAdvertiser ? 'Бюджет / Оплачено' : 'Освоение бюджета'}
+                  </span>
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-indigo-900 transition-transform group-hover:scale-105">
+                    <Gauge size={16} />
+                  </span>
+                </div>
+                <p className="mt-3 flex items-baseline gap-1.5 text-[15px] font-semibold text-ink tnum">
+                  {formatMoneyCompact(spent)}
+                  <span className="text-[12px] font-medium text-ink-muted">
+                    из {formatMoneyCompact(budget)}
+                  </span>
+                </p>
+                <Progress
+                  value={pacing}
+                  label={formatPct(pacing, 0)}
+                  className="mt-2"
+                />
+              </button>
+            )}
           </div>
 
-          {showPayments && (
+          {showBudget && showPayments && (
             <div className="mt-3 rounded-2xl border border-line bg-paper/55 p-4">
               <p className="text-[11px] font-medium uppercase tracking-wider text-ink-muted">
                 История выплат

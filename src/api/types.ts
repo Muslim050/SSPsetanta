@@ -156,6 +156,11 @@ export interface Advertiser {
   requisites: string
   /** Сколько кампаний у бренда — считает сервер, без удалённых. */
   campaignsCount: number
+  /**
+   * Обязателен ли ролик в новой заявке бренда. Пока есть только на проде —
+   * на других средах поля нет, и ролик необязателен.
+   */
+  isCreativeRequired?: boolean
   /** Только для чтения: договоры правятся своими эндпоинтами. */
   contracts: Contract[]
   createdAt: string
@@ -176,6 +181,7 @@ export type AdvertiserInput = Partial<
     | 'color'
     | 'logo'
     | 'requisites'
+    | 'isCreativeRequired'
   >
 > & {
   /** Логотип файлом: id из загрузчика. `null` — убрать логотип. */
@@ -298,6 +304,11 @@ export type CampaignInput = Partial<
 > & {
   /** Ролик файлом: id из загрузчика. `null` — убрать ролик. */
   creativeId?: number | null
+  /**
+   * Бренд заявки — только когда её заводит площадка (без него 400).
+   * Рекламодателю не нужен: бренд берётся из сессии, присланный игнорируется.
+   */
+  advertiserId?: number
 }
 
 /** Ответ загрузчика файлов: `POST /files`. */
@@ -312,7 +323,7 @@ export interface StoredFile {
 }
 
 /* ------------------------------------------------------------------------ */
-/* Отчёт за месяц: файл статистики, разобранный сервером на семь листов.    */
+/* Отчёт за месяц: файл статистики, разобранный сервером на девять листов.  */
 /* ------------------------------------------------------------------------ */
 
 /** Месяц отчёта: `2026-01`. */
@@ -320,13 +331,22 @@ export type ReportPeriod = string
 
 /** Код листа — в порядке исходного файла. */
 export type ReportSheetCode =
-  'ss1uzb' | 'ss2uzb' | 'live1' | 'live2' | 'promo1' | 'promo2' | 'social'
+  | 'ss1uzb'
+  | 'ss2uzb'
+  | 'live1'
+  | 'live2'
+  | 'promo1'
+  | 'promo2'
+  | 'social'
+  | 'ottlive'
+  | 'ottpreroll'
 
 /**
  * Форма листа. Таблицу выбирают по ней, а не по коду: логов выходов четыре,
- * эфиров два, соцсеть одна.
+ * эфиров два, остальные — по одному.
  */
-export type ReportSheetKind = 'spot_log' | 'live_event' | 'social'
+export type ReportSheetKind =
+  'spot_log' | 'live_event' | 'ott_live' | 'preroll' | 'social'
 
 /** Выход ролика. `date` — ISO, `time` — `HH:MM:SS`, как в файле. */
 export interface SpotLogRow {
@@ -335,12 +355,54 @@ export interface SpotLogRow {
   time: string
 }
 
-/** Прямой эфир, в который вставлен ролик. */
+/** Секунды рекламы в месте эфира; null — рекламы там не было. */
+export type Seconds = number | null
+
+/**
+ * Прямой эфир, в который вставлен ролик. Поля выходов и просмотров сервер
+ * требует в каждой строке при сохранении — хотя бы null; в отчётах,
+ * загруженных до нового шаблона, они null.
+ */
 export interface LiveEventRow {
   date: string
   time: string
   tournament: string
   event: string
+  pre: Seconds
+  mid1: Seconds
+  mid2: Seconds
+  post: Seconds
+  views: number | null
+  /**
+   * Бренды блока «Total ads spots»: `brand1`…`brand8`, колонки заводят
+   * руками. Заведённая колонка есть в каждой строке, пустая — ''.
+   */
+  [brand: `brand${number}`]: string | undefined
+}
+
+/** Эфир OTT (LIVE) — то же, что прямой эфир, но без post. */
+export type OttLiveRow = Omit<LiveEventRow, 'post'>
+
+/** Прероллы OTT за период. `percent` — 0…100, до сотых. */
+export interface PrerollRow {
+  percent: number
+  prerolls: number
+  dateFrom: string
+  dateTo: string
+}
+
+/**
+ * Итоги эфиров — считает сервер, обратно не отправляются. `rows` — строк,
+ * `seconds` — весь хронометраж рекламы (pre + mid1 + mid2 + post).
+ */
+export interface LiveTotals {
+  rows: number
+  pre: number
+  mid1: number
+  mid2: number
+  post: number
+  views: number
+  seconds: number
 }
 
 export type SocialNetwork = 'instagram' | 'telegram'
@@ -361,7 +423,17 @@ interface ReportSheetBase {
 
 export type ReportSheet =
   | (ReportSheetBase & { kind: 'spot_log'; rows: SpotLogRow[] })
-  | (ReportSheetBase & { kind: 'live_event'; rows: LiveEventRow[] })
+  | (ReportSheetBase & {
+      kind: 'live_event'
+      rows: LiveEventRow[]
+      totals: LiveTotals
+    })
+  | (ReportSheetBase & {
+      kind: 'ott_live'
+      rows: OttLiveRow[]
+      totals: Omit<LiveTotals, 'post'>
+    })
+  | (ReportSheetBase & { kind: 'preroll'; rows: PrerollRow[] })
   | (ReportSheetBase & {
       kind: 'social'
       rows: SocialRow[]
@@ -380,20 +452,86 @@ export interface ReportImport {
   rowCounts: Partial<Record<ReportSheetCode, number>>
 }
 
-/** Отчёт за месяц целиком — всегда семь листов. */
+/**
+ * Откуда отчёт месяца: из файла (девять листов) или введён вручную (только
+ * цифры по каналам). Нет поля — сервер до ручных отчётов, значит `file`.
+ */
+export type ReportType = 'file' | 'manual'
+
+export type ReportChannel = 'ss1' | 'ss2'
+
+/** Ручной отчёт по каналу — та же форма и на входе, и на выходе. */
+export interface SpotReport {
+  channel: ReportChannel
+  standardCount: number
+  standardSeconds: number
+  liveCount: number
+  liveSeconds: number
+  liveViews: number
+}
+
+/**
+ * Ручной отчёт за месяц целиком: заводит его или заменяет прежний ручной;
+ * файловый отчёт того же месяца не меняется. В `spots` — ровно по записи на
+ * канал; пропущенный счётчик и `null` — одно и то же.
+ */
+export interface ManualReportInput {
+  eventPromoCount: number | null
+  ottPrerollViews: number | null
+  spots: SpotReport[]
+}
+
+/**
+ * Отчёт за месяц целиком. У файлового — девять листов и пустой `spots`,
+ * у ручного — наоборот: записи по каналам и пустой `sheets`. Это два
+ * отдельных отчёта месяца: файловый — `GET …/reports/:period`, ручной —
+ * `GET …/reports/:period/manual`.
+ */
 export interface Report {
   id: number
   contractId: number
   period: ReportPeriod
+  reportType?: ReportType
+  eventPromoCount?: number | null
+  ottPrerollViews?: number | null
   updatedAt: string
   sheets: ReportSheet[]
+  spots?: SpotReport[]
   /** `null` у наблюдателя и рекламодателя: кто загружал, им не показываем. */
   lastImport: ReportImport | null
+}
+
+/**
+ * Итоговая статистика месяца — вкладка Total. `totals` — из ручного отчёта
+ * (нет его — все `null`), `socials` — из листа `social` файлового (нет
+ * файла — нули). Ответ всегда есть, даже без отчётов.
+ */
+export interface StatisticsTotals {
+  /** Выходы рекламы в прямых эфирах, SS1 + SS2. */
+  liveCount: number | null
+  eventPromoCount: number | null
+  /** Секунды обычных выходов и рекламы в эфирах, SS1 + SS2. */
+  totalSeconds: number | null
+  /** Просмотры рекламы в прямых эфирах, SS1 + SS2. */
+  liveViews: number | null
+}
+
+export interface SocialStatistics {
+  network: SocialNetwork
+  posts: number
+  impressions: number
+}
+
+export interface TotalStatistics {
+  totals: StatisticsTotals
+  /** Всегда обе сети: instagram и telegram. */
+  socials: SocialStatistics[]
 }
 
 /** Месяц, за который отчёт загружен. */
 export interface ReportMonth {
   period: ReportPeriod
+  reportType?: ReportType
   updatedAt: string
   lastImport: ReportImport | null
 }
@@ -402,5 +540,6 @@ export interface ReportMonth {
 export interface ReportSheetInput {
   /** Без неё сохранение пройдёт без проверки и может затереть чужую правку. */
   version?: number
-  rows: SpotLogRow[] | LiveEventRow[] | SocialRow[]
+  rows:
+    SpotLogRow[] | LiveEventRow[] | OttLiveRow[] | PrerollRow[] | SocialRow[]
 }
