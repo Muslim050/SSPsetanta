@@ -98,6 +98,12 @@ function inMonth(contract, year, month) {
   return from <= end && to >= start
 }
 
+/** Поступление пришло в этом месяце — по местной дате. */
+function paidInMonth(payment, year, month) {
+  const date = new Date(payment.paidAt)
+  return date.getFullYear() === year && date.getMonth() === month
+}
+
 /** Месяц наступил? Будущие месяцы в фильтре недоступны. */
 function isPassedMonth(year, month) {
   const now = new Date()
@@ -221,7 +227,8 @@ export default function ContractOverview() {
   const paid = scoped.filter(
     ({ contract }) => statusAt(contract, activePeriod) === 'paid',
   ).length
-  // Все поступления по видимым договорам — от свежих к старым.
+  // Поступления по видимым договорам — от свежих к старым. Выбран месяц —
+  // только пришедшие в нём: из них строка «Поступило за …» на плитке.
   const payments = scoped
     .flatMap(({ contract, advertiser }) =>
       (contract.payments ?? []).map((payment) => ({
@@ -229,6 +236,10 @@ export default function ContractOverview() {
         contractNumber: contract.number,
         brand: advertiser.name,
       })),
+    )
+    .filter(
+      (payment) =>
+        activeMonth == null || paidInMonth(payment, activeYear, activeMonth),
     )
     .sort((a, b) => (a.paidAt < b.paidAt ? 1 : -1))
 
@@ -242,6 +253,13 @@ export default function ContractOverview() {
     }),
     { budget: 0, spent: 0 },
   )
+  // Поступило за выбранный месяц — поступления с датой в нём. Плитка
+  // показывает итоги договоров (они сходятся со строками таблицы), а это —
+  // отдельной строкой под ними. Месяц не выбран — строки нет.
+  const monthPaid =
+    activeMonth == null
+      ? null
+      : payments.reduce((sum, payment) => sum + toNumber(payment.amount), 0)
 
   /**
    * Суммы договора. Прирост «Оплачено» сервер сам оформляет поступлением
@@ -392,6 +410,11 @@ export default function ContractOverview() {
           }`}
           budget={money.budget}
           spent={money.spent}
+          note={
+            monthPaid == null
+              ? null
+              : `Поступило за ${MONTHS_FULL[activeMonth].toLowerCase()}: ${formatMoneyCompact(monthPaid)}`
+          }
           hint={`Оплачено договоров: ${paid}. Нажмите — история выплат`}
           open={showPayments}
           onToggle={() => setShowPayments((v) => !v)}
@@ -413,7 +436,9 @@ export default function ContractOverview() {
           <div className="mt-3 max-h-[260px] space-y-1.5 overflow-y-auto">
             {payments.length === 0 ? (
               <p className="rounded-xl bg-paper px-3 py-3 text-center text-[12px] text-ink-muted">
-                Поступлений пока не было.
+                {activeMonth == null
+                  ? 'Поступлений пока не было.'
+                  : `За ${MONTHS_FULL[activeMonth].toLowerCase()} поступлений не было.`}
               </p>
             ) : (
               payments.map((payment, i) => (
@@ -848,7 +873,7 @@ function Td({ children, className }) {
 }
 
 /** Сумма по всем договорам — как карточка «Бюджет / Прибыль» в кампаниях. */
-function MoneyTile({ label, budget, spent, hint, open, onToggle }) {
+function MoneyTile({ label, budget, spent, note, hint, open, onToggle }) {
   const pacing = budget ? (spent / budget) * 100 : 0
   return (
     <button
@@ -876,6 +901,10 @@ function MoneyTile({ label, budget, spent, hint, open, onToggle }) {
         </span>
       </p>
       <Progress value={pacing} label={formatPct(pacing, 0)} className="mt-2" />
+      {/* Деньги месяца: итоги выше — за весь срок договоров. */}
+      {note && (
+        <p className="mt-2 text-[12px] font-medium text-indigo-900">{note}</p>
+      )}
     </button>
   )
 }
