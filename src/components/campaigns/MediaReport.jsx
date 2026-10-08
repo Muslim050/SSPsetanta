@@ -26,6 +26,7 @@ import { useToast } from '@/components/ui/Toast.jsx'
 import { useConfirm } from '@/components/ui/Confirm.jsx'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal.jsx'
+import { Loader } from '@/components/ui/Loader.jsx'
 import { formatDateTime } from '@/lib/format.js'
 import { cn } from '@/lib/cn.js'
 import { MONTHS_FULL } from './MonthTabs.jsx'
@@ -664,6 +665,32 @@ export function MediaReport({
     current?.kind === 'report'
       ? sheets.find((item) => item.code === current.code)
       : null
+
+  // Месяц открыли впервые — пока не пришли список месяцев, отчёт и цифры
+  // Total/Spot, показываем одно понятное ожидание вместо плашки с мелкой
+  // подписью, недоступной кнопки и пустой сводки. Перечитывание уже
+  // загруженного (после импорта или правки) сюда не попадает: у запроса
+  // есть данные, и isPending у него false.
+  const fetchingFirst = (query) =>
+    query.isPending && query.fetchStatus !== 'idle'
+  const monthLoading =
+    !!contractId &&
+    (fetchingFirst(months) ||
+      (inList && fetchingFirst(report)) ||
+      fetchingFirst(manual) ||
+      fetchingFirst(totalStats))
+
+  if (monthLoading) {
+    return (
+      <div className={className}>
+        <Loader
+          size={360}
+          label={`Загружаем отчёт за ${periodLabel(period)}…`}
+          className="min-h-0 py-6 sm:min-h-0"
+        />
+      </div>
+    )
+  }
 
   return (
     <div className={className}>

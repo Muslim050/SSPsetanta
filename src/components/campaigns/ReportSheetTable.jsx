@@ -156,7 +156,7 @@ const mergeSpans = (columns, keyOf) =>
 /** Класс ячейки шапки по колонке. */
 const headClass = (column, span = 1) =>
   cn(
-    'border-l border-black/10 px-3',
+    'border-b border-l border-black/10 px-3',
     column.accent
       ? 'w-[130px] bg-[#ff665f]/90 text-center'
       : column.spot
@@ -253,11 +253,16 @@ const liveTotals = (rows, spotKeys) => {
   return totals
 }
 
+// Сетка таблицы — сплошными линиями по ячейкам: полупрозрачные `border-line`
+// на цветных блоках сливались с заливкой. Обычные ячейки — светло-серой,
+// цветные блоки — белой (GROUP_CELL перебивает цвет через tailwind-merge).
+const GRID = 'border-[#dad7cf]'
+
 // Блоки красим, как в файле: выходы — красным (как дата и время в шапке),
 // бренды — зелёным.
 const GROUP_CELL = {
-  [SPOTS_GROUP]: 'border-white/50 bg-[#ff665f]/90',
-  [BRANDS_GROUP]: 'border-white/50 bg-[#84c450]/90',
+  [SPOTS_GROUP]: 'border-white bg-[#ff665f]/90',
+  [BRANDS_GROUP]: 'border-white bg-[#84c450]/90',
 }
 
 /**
@@ -275,7 +280,12 @@ const EditRow = memo(function EditRow({
 }) {
   return (
     <tr className={cn('group', index % 2 ? 'bg-paper/35' : 'bg-surface')}>
-      <td className="relative px-2 py-1.5 text-center text-[11px] text-ink-muted tnum">
+      <td
+        className={cn(
+          'relative border-b px-2 py-1.5 text-center text-[11px] text-ink-muted tnum',
+          GRID,
+        )}
+      >
         {index + 1}
         {/* «+» на нижней границе строки: вставляет пустую строку под ней. */}
         <button
@@ -294,7 +304,8 @@ const EditRow = memo(function EditRow({
           <td
             key={column.key}
             className={cn(
-              'border-l border-line px-1.5 py-1',
+              'border-b border-l px-1.5 py-1',
+              GRID,
               GROUP_CELL[column.group],
             )}
           >
@@ -343,7 +354,7 @@ const EditRow = memo(function EditRow({
           </td>
         )
       })}
-      <td className="w-10 px-1 text-center">
+      <td className={cn('w-10 border-b border-l px-1 text-center', GRID)}>
         <button
           type="button"
           onClick={() => onRemove(index)}
@@ -689,12 +700,15 @@ export function ReportSheetTable({
       )}
 
       <div className="max-h-[560px] overflow-auto">
-        <table className="w-full border-collapse text-sm">
+        {/* border-separate, а не collapse: в collapse линии принадлежат
+            таблице, и у закреплённых шапки и итогов сквозь них просвечивали
+            строки под ними. Здесь каждая ячейка рисует свои линии сама. */}
+        <table className="w-full border-separate border-spacing-0 text-sm">
           <thead className="sticky top-0 z-10">
             <tr className="bg-indigo-500 text-[11px] font-semibold uppercase tracking-wider text-ink">
               <th
                 rowSpan={grouped ? 2 : undefined}
-                className="w-12 px-2 py-3 text-center"
+                className="w-12 border-b border-black/10 px-2 py-3 text-center"
               >
                 №
               </th>
@@ -719,7 +733,10 @@ export function ReportSheetTable({
                   ),
               )}
               {editing && (
-                <th rowSpan={grouped ? 2 : undefined} className="w-10" />
+                <th
+                  rowSpan={grouped ? 2 : undefined}
+                  className="w-10 border-b border-black/10"
+                />
               )}
             </tr>
             {grouped && (
@@ -754,7 +771,7 @@ export function ReportSheetTable({
               </tr>
             )}
           </thead>
-          <tbody className="divide-y divide-line">
+          <tbody>
             {!shown.length && (
               <tr>
                 <td
@@ -797,14 +814,20 @@ export function ReportSheetTable({
                       index % 2 ? 'bg-paper/35' : 'bg-surface',
                     )}
                   >
-                    <td className="px-2 py-2 text-center text-[11px] text-ink-muted tnum">
+                    <td
+                      className={cn(
+                        'border-b px-2 py-2 text-center text-[11px] text-ink-muted tnum',
+                        GRID,
+                      )}
+                    >
                       {index + 1}
                     </td>
                     {columns.map((column) => (
                       <td
                         key={column.key}
                         className={cn(
-                          'border-l border-line px-3 py-2 text-[13px] text-ink',
+                          'border-b border-l px-3 py-2 text-[13px] text-ink',
+                          GRID,
                           column.accent && 'text-center tnum',
                           column.spot
                             ? 'text-center tnum'
@@ -836,23 +859,34 @@ export function ReportSheetTable({
           </tbody>
           {totals && shown.length > 0 && (
             <tfoot className="sticky bottom-0 z-10 bg-paper text-[13px] font-semibold text-ink tnum">
-              <tr className="border-t border-line">
+              <tr>
                 <td
                   colSpan={firstSpot + 1}
-                  className="px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-ink-muted"
+                  className={cn(
+                    'border-t px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-ink-muted',
+                    GRID,
+                  )}
                 >
                   Сумма секунд
                 </td>
                 {spotKeys.map((key) => (
                   <td
                     key={key}
-                    className="border-l border-line px-2 py-2 text-center"
+                    className={cn(
+                      'border-t border-l px-2 py-2 text-center',
+                      GRID,
+                    )}
                   >
                     {formatNumber(totals[key])}
                   </td>
                 ))}
                 {hasViews && (
-                  <td className="border-l border-line px-3 py-2 text-right">
+                  <td
+                    className={cn(
+                      'border-t border-l px-3 py-2 text-right',
+                      GRID,
+                    )}
+                  >
                     <span className="block whitespace-nowrap text-[10px] font-medium uppercase tracking-wider text-ink-muted">
                       Сумма просмотров
                     </span>
@@ -862,25 +896,34 @@ export function ReportSheetTable({
                 {afterSpots - (hasViews ? 1 : 0) > 0 && (
                   <td
                     colSpan={afterSpots - (hasViews ? 1 : 0)}
-                    className="border-l border-line"
+                    className={cn('border-t border-l', GRID)}
                   />
                 )}
               </tr>
-              <tr className="border-t border-line">
+              <tr>
                 <td
                   colSpan={firstSpot + 1}
-                  className="px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-ink-muted"
+                  className={cn(
+                    'border-t px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-ink-muted',
+                    GRID,
+                  )}
                 >
                   Итого секунд
                 </td>
                 <td
                   colSpan={spotKeys.length}
-                  className="border-l border-line px-2 py-2 text-center"
+                  className={cn(
+                    'border-t border-l px-2 py-2 text-center',
+                    GRID,
+                  )}
                 >
                   {formatNumber(totals.seconds)}
                 </td>
                 {afterSpots > 0 && (
-                  <td colSpan={afterSpots} className="border-l border-line" />
+                  <td
+                    colSpan={afterSpots}
+                    className={cn('border-t border-l', GRID)}
+                  />
                 )}
               </tr>
             </tfoot>
