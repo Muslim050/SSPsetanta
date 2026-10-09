@@ -35,6 +35,19 @@ export function get(contractId: number, period: ReportPeriod): Promise<Report> {
 }
 
 /**
+ * DELETE /contracts/:id/reports/:period — удаляет файловый отчёт месяца
+ * насовсем: листы со строками, историю загрузок и исходные файлы. Ручной
+ * отчёт месяца (цифры Spot) не трогает. Файлового отчёта нет — 404. Только
+ * площадка; пока есть только на проде.
+ */
+export function remove(
+  contractId: number,
+  period: ReportPeriod,
+): Promise<void> {
+  return request<void>(`${base(contractId)}/${period}`, { method: 'DELETE' })
+}
+
+/**
  * POST /contracts/:id/reports/:period/import — файл за месяц, multipart.
  * Повторный импорт заменяет месяц целиком, вместе с ручными правками.
  * Ошибки разбора — 400 `report_invalid` со списком в `details`.
