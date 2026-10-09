@@ -634,10 +634,27 @@ export function MediaReport({
   const manual = useManualReport(contractId, period)
   const spot = useMemo(() => spotSummary(manual.data), [manual.data])
 
+  // Вкладка листа — только если в нём есть строки; у соцсетей — строки этой
+  // сети. Группа без вкладок пропадает целиком. У ручного отчёта листов нет —
+  // остаются только Total и Spot.
+  const reportGroups = useMemo(() => {
+    const byCode = Object.fromEntries(
+      (report.data?.sheets ?? []).map((item) => [item.code, item]),
+    )
+    return REPORT_GROUPS.map((group) => ({
+      ...group,
+      items: group.items.filter((item) => {
+        const rows = byCode[item.code]?.rows ?? []
+        return item.network
+          ? rows.some((row) => row.network === item.network)
+          : rows.length > 0
+      }),
+    })).filter((group) => group.items.length > 0)
+  }, [report.data?.sheets])
+
   const { groups, tabs, addCategory, removeCategory } = useCampaignTabs(
     contractId ?? 'default',
-    // У ручного отчёта листов нет — только цифры вкладки Spot.
-    report.data?.sheets?.length ? REPORT_GROUPS : [],
+    reportGroups,
   )
   const current = tabs.find((item) => item.value === tab)
 
