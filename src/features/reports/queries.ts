@@ -173,6 +173,43 @@ export function useImportReport() {
 }
 
 /**
+ * Удаление файлового отчёта за месяц. Месяц сразу убираем из списка — иначе
+ * отчёт за него спросили бы снова и получили 404, — и выбрасываем сам отчёт
+ * из кэша. Ручной отчёт месяца остаётся: его запись в списке не трогаем.
+ * Итоги Total перечитываем — соцсети в них из файлового отчёта.
+ */
+export function useDeleteReport() {
+  const client = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      contractId,
+      period,
+    }: {
+      contractId: number
+      period: ReportPeriod
+    }) => reportsApi.remove(contractId, period),
+    onSuccess: (_, { contractId, period }) => {
+      client.setQueryData<ReportMonth[]>(
+        reportKeys.months(contractId),
+        (months) =>
+          months?.filter(
+            (item) => item.period !== period || item.reportType === 'manual',
+          ),
+      )
+      client.removeQueries({ queryKey: reportKeys.report(contractId, period) })
+      client.invalidateQueries({ queryKey: reportKeys.months(contractId) })
+      client.invalidateQueries({
+        queryKey: reportKeys.imports(contractId, period),
+      })
+      client.invalidateQueries({
+        queryKey: reportKeys.totalStats(contractId, period),
+      })
+    },
+  })
+}
+
+/**
  * Сохранение ручного отчёта за месяц. Ответ кладём в кэш ручного отчёта
  * сразу — цифры Spot обновятся без ожидания, — и всё равно перечитываем его
  * за период, а с ним список месяцев: месяц мог появиться впервые. Файловый
