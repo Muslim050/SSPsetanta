@@ -6,12 +6,14 @@ import {
   Download,
   FileSpreadsheet,
   History,
+  Trash2,
   Upload,
 } from 'lucide-react'
 import { isApiError } from '@/api/errors'
 import { useAuth } from '@/features/auth/useAuth'
 import {
   reportKeys,
+  useDeleteReport,
   useExportReport,
   useImportReport,
   useReport,
@@ -293,10 +295,13 @@ function ReportFileBar({ contractId, period, months, report, onImported }) {
   // Имя разбираемого файла — подпись под «проявляющимся» отчётом.
   const [pendingName, setPendingName] = useState('')
   const { mutate: exportReport, isPending: exporting } = useExportReport()
+  const { mutate: deleteReport, isPending: deleting } = useDeleteReport()
 
   const month = periodLabel(period)
   const loaded = !!report.data
   const lastImport = report.data?.lastImport
+  // Удалить можно только файловый отчёт: ручной (цифры Spot) — отдельный.
+  const fileReport = loaded && report.data.reportType !== 'manual'
 
   const upload = async (file) => {
     if (!file || importing) return
@@ -338,6 +343,25 @@ function ReportFileBar({ contractId, period, months, report, onImported }) {
     )
   }
 
+  /** Файловый отчёт месяца — насовсем, после подтверждения. */
+  const removeReport = async () => {
+    const ok = await confirm({
+      title: `Удалить отчёт за ${month}?`,
+      description: 'Файловый отчёт удалится насовсем',
+      body: 'Удалятся все листы месяца вместе с правками, история загрузок и исходные файлы. Восстановить нельзя. Цифры Spot, заведённые вручную, останутся.',
+      confirmText: 'Удалить',
+    })
+    if (!ok) return
+    deleteReport(
+      { contractId, period },
+      {
+        onSuccess: () => toast.success(`Отчёт за ${month} удалён`),
+        onError: (error) =>
+          toast.error(error.message || 'Не удалось удалить отчёт'),
+      },
+    )
+  }
+
   const download = () =>
     exportReport(
       { contractId, period },
@@ -350,23 +374,25 @@ function ReportFileBar({ contractId, period, months, report, onImported }) {
   // Ошибка списка месяцев — это не «файла нет»: сервер просто не ответил.
   const status = importing
     ? `Загружаем файл «${pendingName}» — отчёт появится ниже`
-    : months.isError
-      ? 'Не удалось проверить, загружен ли файл'
-      : months.isPending
-        ? 'Проверяем, загружен ли файл…'
-        : report.isPending && report.fetchStatus !== 'idle'
-          ? `Загружаем отчёт за ${month}…`
-          : loaded
-            ? report.data.reportType === 'manual'
-              ? `Отчёт введён вручную на вкладке Spot · ${formatDateTime(report.data.updatedAt)}`
-              : lastImport
-                ? `Файл загружен ${formatDateTime(lastImport.at)} · ${lastImport.by}`
-                : `Обновлён ${formatDateTime(report.data.updatedAt)}`
-            : canUpload
-              ? `Файл статистики за ${month} ещё не загружен`
-              : // Загружает только площадка: остальным говорим, что отчёт
-                // в работе, — иначе пустая плашка без кнопки выглядит как поломка.
-                'Отчёт в процессе формирования!'
+    : deleting
+      ? `Удаляем отчёт за ${month}…`
+      : months.isError
+        ? 'Не удалось проверить, загружен ли файл'
+        : months.isPending
+          ? 'Проверяем, загружен ли файл…'
+          : report.isPending && report.fetchStatus !== 'idle'
+            ? `Загружаем отчёт за ${month}…`
+            : loaded
+              ? report.data.reportType === 'manual'
+                ? `Отчёт введён вручную на вкладке Spot · ${formatDateTime(report.data.updatedAt)}`
+                : lastImport
+                  ? `Файл загружен ${formatDateTime(lastImport.at)} · ${lastImport.by}`
+                  : `Обновлён ${formatDateTime(report.data.updatedAt)}`
+              : canUpload
+                ? `Файл статистики за ${month} ещё не загружен`
+                : // Загружает только площадка: остальным говорим, что отчёт
+                  // в работе, — иначе пустая плашка без кнопки выглядит как поломка.
+                  'Отчёт в процессе формирования!'
 
   // Месяц без файла — здесь загрузка главное, что можно сделать. Даём ей
   // целую зону, а не кнопку на краю плашки: на широком экране кнопку там
@@ -574,7 +600,9 @@ function ReportFileBar({ contractId, period, months, report, onImported }) {
                 size="sm"
                 variant={loaded ? 'secondary' : 'primary'}
                 onClick={() => inputRef.current?.click()}
-                disabled={importing || months.isPending || months.isError}
+                disabled={
+                  importing || deleting || months.isPending || months.isError
+                }
               >
                 <Upload size={15} />
                 {importing
@@ -584,6 +612,18 @@ function ReportFileBar({ contractId, period, months, report, onImported }) {
                     : 'Загрузить файл'}
               </Button>
             </>
+          )}
+          {canUpload && fileReport && (
+            <Button
+              size="sm"
+              variant="danger"
+              onClick={removeReport}
+              disabled={deleting || importing}
+              title="Удалить файловый отчёт за месяц насовсем"
+            >
+              <Trash2 size={15} />
+              {deleting ? 'Удаляем…' : 'Удалить'}
+            </Button>
           )}
         </div>
       </motion.div>
