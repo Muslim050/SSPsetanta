@@ -385,7 +385,7 @@ export function ReportSheetTable({
   title,
   subtitle,
 }) {
-  const { canEdit, isAdvertiser } = useAuth()
+  const { canEdit, isAdvertiser, isViewer } = useAuth()
   // Загружать и править отчёт может только площадка.
   const readOnly = isAdvertiser || !canEdit
   const toast = useToast()
@@ -412,9 +412,15 @@ export function ReportSheetTable({
   const shown = editing ? draft : rows
 
   const brandCount = isLive ? countBrands(shown) : 0
+  // Наблюдателю просмотры не показываем — ни колонку Views у эфиров (Live
+  // spot SS1/SS2 и OTT), ни «Сумму просмотров» в итогах. Править он не
+  // может, поэтому в сохранение колонка не попадает.
   const columns = useMemo(
-    () => [...COLUMNS[sheet.kind], ...brandColumns(brandCount)],
-    [sheet.kind, brandCount],
+    () =>
+      [...COLUMNS[sheet.kind], ...brandColumns(brandCount)].filter(
+        (column) => !(isViewer && column.key === 'views'),
+      ),
+    [sheet.kind, brandCount, isViewer],
   )
 
   // Сменили лист или месяц — незаконченную правку не тащим за собой.
