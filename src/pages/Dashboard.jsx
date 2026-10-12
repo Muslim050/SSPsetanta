@@ -23,7 +23,7 @@ import {
   useSaveViewsStatistics,
   useViewsStatistics,
 } from '@/features/reports/queries'
-import { mockRangeSummary } from '@/features/reports/statisticsMock'
+import { usePeriodTotals } from '@/features/reports/usePeriodTotals'
 import {
   AGE_KEYS,
   audienceDraft,
@@ -796,18 +796,24 @@ export default function Dashboard() {
   // Рекламодатель для итогов в шапке; пусто — все.
   const { data: advertisers = [] } = useAdvertisers()
   const [advertiserId, setAdvertiserId] = useState('')
-  // Итоги за период — как у рекламодателя, пока на моках (у выбранного
-  // рекламодателя — его демо-доля); соцсети, устройства и города ниже —
-  // свои, из статистики просмотров, поэтому в шапке их нет.
-  const headerSummary = {
-    ...mockRangeSummary(range.from, range.to, { advertiserId }),
-    social: {},
-    device: null,
-    geo: [],
-  }
+  // Итоги за период — с сервера, сложенные по месяцам: по всем договорам —
+  // из статистики просмотров, у выбранного рекламодателя — total-statistics
+  // его договоров (см. usePeriodTotals).
+  const advertiser = advertisers.find(
+    (item) => String(item.id) === advertiserId,
+  )
+  const header = usePeriodTotals({
+    periods: Array.from(
+      { length: range.range.to - range.range.from + 1 },
+      (_, index) => periodOf(range.year, range.range.from + index),
+    ),
+    contractIds: advertiserId
+      ? (advertiser?.contracts ?? []).map((contract) => contract.id)
+      : null,
+  })
 
   // Разделы аудитории — статистика просмотров месяца с сервера (одна на все
-  // договоры). Шапка и YouTube пока живут демо-данными в браузере.
+  // договоры). YouTube пока живёт демо-данными в браузере.
   const views = useViewsStatistics(period)
   const { mutate: saveViews, isPending: savingViews } = useSaveViewsStatistics()
   const audience = useMemo(
@@ -935,7 +941,9 @@ export default function Dashboard() {
 
       <PeriodStatistics
         period={range}
-        summary={headerSummary}
+        summary={header.summary}
+        loading={header.loading}
+        error={header.error}
         filter={
           <Field label="Рекламодатель">
             <Select

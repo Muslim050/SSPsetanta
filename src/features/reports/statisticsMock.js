@@ -77,17 +77,11 @@ function emptySummary() {
 
 /**
  * Сводка за период по месяцам ('YYYY-MM', оба включительно) — в той же
- * форме, что totalSummary: { totals, social, device, geo }. advertiserId —
- * цифры одного рекламодателя (тоже демо), без него — по всем. Период пустой, перевёрнутый
+ * форме, что totalSummary: { totals, social, device, geo }. Период пустой, перевёрнутый
  * или целиком в будущем — значения null.
  */
-export function mockRangeSummary(from, to, { advertiserId } = {}) {
+export function mockRangeSummary(from, to) {
   if (!from || !to || from > to) return emptySummary()
-  // Выбран рекламодатель — его доля общих цифр: 0.15–0.55, у каждого своя
-  // и постоянная.
-  const share = advertiserId
-    ? 0.15 + ((Number(advertiserId) * 53) % 41) / 100
-    : 1
 
   // Сколько «средних» месяцев в периоде.
   let weight = 0
@@ -100,7 +94,7 @@ export function mockRangeSummary(from, to, { advertiserId } = {}) {
   }
   if (!hasData) return emptySummary()
 
-  const scale = (value) => Math.round(value * weight * share)
+  const scale = (value) => Math.round(value * weight)
   return {
     totals: Object.fromEntries(
       Object.entries(BASE_TOTALS).map(([key, value]) => [key, scale(value)]),

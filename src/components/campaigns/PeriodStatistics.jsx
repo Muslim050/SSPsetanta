@@ -8,10 +8,10 @@ import { cn } from '@/lib/cn.js'
  * Верх страницы «Статистика»: вкладки месяцев и карточка «Общая статистика
  * Setanta Sports» с периодом «от и до» и итогами за него. Одна и та же у
  * рекламодателя и у площадки. `period` — из useMonthRange (lib), `summary` — в
- * форме totalSummary. `filter` — поле перед периодом (у площадки — выбор
- * рекламодателя).
+ * форме totalSummary (null — грузится: `loading`, или не загрузилось:
+ * `error`). `filter` — поле перед периодом (у площадки — выбор рекламодателя).
  */
-export function PeriodStatistics({ period, summary, filter }) {
+export function PeriodStatistics({ period, summary, loading, error, filter }) {
   return (
     <>
       <div className="mb-4">
@@ -28,6 +28,8 @@ export function PeriodStatistics({ period, summary, filter }) {
       <TotalStatisticsReport
         title="Общая статистика Setanta Sports"
         summary={summary}
+        loading={loading}
+        error={error}
         emptyNote="За выбранный период данных нет."
         actions={
           <div
