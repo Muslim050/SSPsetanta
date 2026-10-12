@@ -56,7 +56,8 @@ export function BrandTabs({
               'flex shrink-0 relative items-center gap-2.5 rounded-xl border py-1.5 pl-1.5 pr-3 transition-colors focus-ring',
               active
                 ? 'border-ink/15 bg-ink/6'
-                : 'border-line bg-surface hover:bg-ink/3',
+                : // Наведение — фирменной жёлтой подсветкой, как у карточек.
+                  'border-line bg-surface hover:border-indigo-400 hover:bg-indigo-50',
             )}
           >
             {b.color ? (
