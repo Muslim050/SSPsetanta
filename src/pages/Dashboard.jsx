@@ -18,10 +18,12 @@ import {
 } from 'lucide-react'
 import { useAuth } from '@/features/auth/useAuth'
 import { useData } from '@/context/DataContext.jsx'
+import { useAdvertisers } from '@/features/advertisers/queries'
 import {
   useSaveViewsStatistics,
   useViewsStatistics,
 } from '@/features/reports/queries'
+import { mockRangeSummary } from '@/features/reports/statisticsMock'
 import {
   AGE_KEYS,
   audienceDraft,
@@ -29,7 +31,7 @@ import {
   audienceProblem,
   audienceToInput,
 } from '@/features/reports/viewsStatistics'
-import { MonthTabs, MONTHS_FULL } from '@/components/campaigns/MonthTabs.jsx'
+import { PeriodStatistics } from '@/components/campaigns/PeriodStatistics.jsx'
 import { SegmentTabs } from '@/components/ui/Tabs.jsx'
 import { useToast } from '@/components/ui/Toast.jsx'
 import { useConfirm } from '@/components/ui/Confirm.jsx'
@@ -38,11 +40,15 @@ import { cloneOverview } from '@/lib/overviewSeed.js'
 import { PageHeader } from '@/components/PageHeader.jsx'
 import { Card } from '@/components/ui/Card.jsx'
 import { Button } from '@/components/ui/Button'
+import { Field, Select } from '@/components/ui/Field'
+import { Combobox } from '@/components/ui/Combobox.jsx'
 import { Loader } from '@/components/ui/Loader.jsx'
 import { SharePie } from '@/components/charts/SharePie.jsx'
 import { colorAt } from '@/components/charts/palette.js'
 import { cn } from '@/lib/cn.js'
 import { uid } from '@/lib/id.js'
+import { leaguesFor, SPORTS, UZ_CITIES } from '@/lib/audienceOptions.js'
+import { periodOf, useMonthRange } from '@/lib/useMonthRange.js'
 
 const inputClass =
   'w-full rounded-lg border border-indigo-300 bg-surface px-2 py-1 text-sm text-ink outline-hidden transition-colors focus:border-indigo-500 focus-ring'
@@ -82,31 +88,6 @@ function EditNumber({ editing, value, onChange, className, children }) {
       onBlur={() => setText(null)}
       className={cn(inputClass, 'tnum text-right', className)}
     />
-  )
-}
-
-/** Шапка вкладки: заголовок отчёта — не редактируется. */
-function MediaSummary({ data }) {
-  const { summary } = data
-
-  return (
-    <>
-      <section className="relative overflow-hidden rounded-[28px] border border-indigo-200 bg-linear-to-br from-surface via-[#fffdf5] to-indigo-100 p-5 shadow-lift sm:p-7">
-        <div className="pointer-events-none absolute -right-24 -top-32 h-72 w-72 rounded-full border border-indigo-300/60" />
-        <div className="pointer-events-none absolute -right-8 -top-12 h-44 w-44 rounded-full bg-indigo-200/45 blur-3xl" />
-        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div className="min-w-0">
-            <div className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50/80 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-indigo-800">
-              <span className="h-1.5 w-1.5 rounded-full bg-indigo-400" />
-              Setanta Media Report
-            </div>
-            <h2 className="mt-2 font-display text-2xl font-semibold text-ink sm:text-3xl">
-              {summary.title}
-            </h2>
-          </div>
-        </div>
-      </section>
-    </>
   )
 }
 
@@ -333,30 +314,42 @@ function AudienceAgeReport({ data, editing, patch, emptyText }) {
                   className="transition-colors hover:bg-indigo-50/70"
                 >
                   <td className="px-5 py-3.5 font-semibold text-ink">
-                    <EditText
-                      editing={editing}
-                      value={row.sport}
-                      onChange={(sport) =>
-                        patch({
-                          leagueAgeRows: leagueAgeRows.map((r) =>
-                            r.id === row.id ? { ...r, sport } : r,
-                          ),
-                        })
-                      }
-                    />
+                    {editing ? (
+                      <Combobox
+                        value={row.sport}
+                        options={SPORTS}
+                        placeholder="Вид спорта"
+                        aria-label="Вид спорта"
+                        onChange={(sport) =>
+                          patch({
+                            leagueAgeRows: leagueAgeRows.map((r) =>
+                              r.id === row.id ? { ...r, sport } : r,
+                            ),
+                          })
+                        }
+                      />
+                    ) : (
+                      row.sport
+                    )}
                   </td>
                   <td className="max-w-[270px] px-5 py-3.5 text-[13px] text-ink-soft">
-                    <EditText
-                      editing={editing}
-                      value={row.leagues}
-                      onChange={(leagues) =>
-                        patch({
-                          leagueAgeRows: leagueAgeRows.map((r) =>
-                            r.id === row.id ? { ...r, leagues } : r,
-                          ),
-                        })
-                      }
-                    />
+                    {editing ? (
+                      <Combobox
+                        value={row.leagues}
+                        options={leaguesFor(row.sport)}
+                        placeholder="Лига"
+                        aria-label="Лига"
+                        onChange={(leagues) =>
+                          patch({
+                            leagueAgeRows: leagueAgeRows.map((r) =>
+                              r.id === row.id ? { ...r, leagues } : r,
+                            ),
+                          })
+                        }
+                      />
+                    ) : (
+                      row.leagues
+                    )}
                   </td>
                   {row.ages.map((value, index) => (
                     <td
@@ -516,17 +509,32 @@ function AudienceBreakdown({ data, editing, patch, emptyText }) {
               {cityShare.map((city) => (
                 <tr key={city.id} className="hover:bg-ink/1.5">
                   <td className="px-5 py-2.5 font-medium text-ink-soft">
-                    <EditText
-                      editing={editing}
-                      value={city.name}
-                      onChange={(name) =>
-                        patch({
-                          cityShare: cityShare.map((c) =>
-                            c.id === city.id ? { ...c, name } : c,
-                          ),
-                        })
-                      }
-                    />
+                    {editing ? (
+                      <Combobox
+                        value={city.name}
+                        // Город, уже стоящий в другой строке, не предлагаем.
+                        options={UZ_CITIES.filter(
+                          (name) =>
+                            !cityShare.some(
+                              (other) =>
+                                other.id !== city.id &&
+                                other.name.trim().toLowerCase() ===
+                                  name.toLowerCase(),
+                            ),
+                        )}
+                        placeholder="Город"
+                        aria-label="Город"
+                        onChange={(name) =>
+                          patch({
+                            cityShare: cityShare.map((c) =>
+                              c.id === city.id ? { ...c, name } : c,
+                            ),
+                          })
+                        }
+                      />
+                    ) : (
+                      city.name
+                    )}
                   </td>
                   <td className="relative px-5 py-2.5 text-right">
                     {!editing && (
@@ -774,14 +782,29 @@ export default function Dashboard() {
   const confirm = useConfirm()
   const firstName = user.name.split(' ')[0]
 
-  // Обзор ведётся помесячно: по умолчанию открываем текущий месяц.
-  const now = new Date()
-  const [year, setYear] = useState(now.getFullYear())
-  const [month, setMonth] = useState(now.getMonth())
-  const period = `${year}-${String(month + 1).padStart(2, '0')}`
-  const years = [now.getFullYear() - 1, now.getFullYear()]
-  const overview = overviewFor(period)
-  const monthLabel = `${MONTHS_FULL[month].toLowerCase()} ${year}`
+  // Правки копим в черновике: «Отмена» возвращает сохранённые данные.
+  const [draft, setDraft] = useState(null)
+
+  // Период — как у рекламодателя: вкладки месяцев и «от и до». Сменили его —
+  // черновик прошлого периода за собой не тащим.
+  const range = useMonthRange({ onChange: () => setDraft(null) })
+  // Аудитория и YouTube ведутся помесячно: они есть, только когда период —
+  // ровно один месяц.
+  const period = range.month != null ? periodOf(range.year, range.month) : null
+  const overview = overviewFor(period ?? range.to)
+  const monthLabel = range.label
+  // Рекламодатель для итогов в шапке; пусто — все.
+  const { data: advertisers = [] } = useAdvertisers()
+  const [advertiserId, setAdvertiserId] = useState('')
+  // Итоги за период — как у рекламодателя, пока на моках (у выбранного
+  // рекламодателя — его демо-доля); соцсети, устройства и города ниже —
+  // свои, из статистики просмотров, поэтому в шапке их нет.
+  const headerSummary = {
+    ...mockRangeSummary(range.from, range.to, { advertiserId }),
+    social: {},
+    device: null,
+    geo: [],
+  }
 
   // Разделы аудитории — статистика просмотров месяца с сервера (одна на все
   // договоры). Шапка и YouTube пока живут демо-данными в браузере.
@@ -801,8 +824,6 @@ export default function Dashboard() {
   // они не читаются.
   const [tab, setTab] = useState('media')
 
-  // Правки копим в черновике: «Отмена» возвращает сохранённые данные.
-  const [draft, setDraft] = useState(null)
   // Разделы аудитории на входе в правку: не меняли — на сервер не шлём, иначе
   // правка одного YouTube записала бы месяцу нули вместо «не введено».
   const [audienceBase, setAudienceBase] = useState('')
@@ -813,24 +834,6 @@ export default function Dashboard() {
     const base = audienceDraft(audience)
     setAudienceBase(JSON.stringify(audienceToInput(base)))
     setDraft({ ...cloneDraft(overview), ...base })
-  }
-
-  // Сменили период — черновик прошлого месяца за собой не тащим.
-  // Крестик у вкладок (и повторный клик по месяцу) снимают выбор — в обзоре
-  // «без месяца» смотреть нечего, поэтому возвращаемся к текущему.
-  const pickMonth = (nextMonth) => {
-    setDraft(null)
-    if (nextMonth == null) {
-      setYear(now.getFullYear())
-      setMonth(now.getMonth())
-      return
-    }
-    setMonth(nextMonth)
-  }
-
-  const pickYear = (nextYear) => {
-    setDraft(null)
-    setYear(nextYear)
   }
 
   const patch = (part) => setDraft((current) => ({ ...current, ...part }))
@@ -886,7 +889,7 @@ export default function Dashboard() {
                 isAdvertiser
                   ? 'по вашим медиаразмещениям'
                   : 'медиаразмещений и аудитории'
-              } за ${MONTHS_FULL[month].toLowerCase()} ${year}.`
+              } за ${monthLabel}.`
         }
       >
         {/* Данные обзора ведёт площадка: наблюдателю кнопки не показываем. */}
@@ -920,8 +923,9 @@ export default function Dashboard() {
             <Button
               variant="primary"
               onClick={startEditing}
-              // Правка начинается с данных месяца — без них не с чего.
-              disabled={!audience}
+              // Правка — за один месяц и с его данными: без них не с чего.
+              disabled={!period || !audience}
+              title={period ? undefined : 'Править можно один месяц'}
             >
               <Pencil size={16} />
               Редактировать
@@ -929,20 +933,29 @@ export default function Dashboard() {
           ))}
       </PageHeader>
 
-      {/* Период обзора: цифры на странице ведутся помесячно. */}
-      <div className="mb-4">
-        <MonthTabs
-          year={year}
-          years={years}
-          onYearChange={pickYear}
-          value={month}
-          onChange={pickMonth}
-          // В обзоре месяц обязателен, поэтому сброс возвращает к текущему.
-          resetLabel="Вернуться к текущему месяцу"
-        />
-      </div>
+      <PeriodStatistics
+        period={range}
+        summary={headerSummary}
+        filter={
+          <Field label="Рекламодатель">
+            <Select
+              value={advertiserId}
+              onChange={(e) => setAdvertiserId(e.target.value)}
+            >
+              <option value="">Все рекламодатели</option>
+              {[...advertisers]
+                .sort((a, b) => a.name.localeCompare(b.name, 'ru'))
+                .map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+            </Select>
+          </Field>
+        }
+      />
 
-      <div className="mb-4">
+      <div className="mb-4 mt-6">
         <SegmentTabs
           items={[
             { value: 'media', label: 'Медиа и аудитория' },
@@ -953,9 +966,10 @@ export default function Dashboard() {
         />
       </div>
 
-      {tab === 'media' ? (
+      {!period ? (
+        <NotEntered text="Возраст, устройства, лиги, города и YouTube ведутся по месяцам — выберите один месяц во вкладках." />
+      ) : tab === 'media' ? (
         <>
-          <MediaSummary data={data} />
           {viewsLoading ? (
             <Loader
               size={360}
