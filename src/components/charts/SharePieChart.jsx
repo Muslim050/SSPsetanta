@@ -5,7 +5,7 @@ import {
   ChartTooltipContent,
 } from '@/components/ui/chart'
 import { colorAt } from './palette.js'
-import { formatPct } from '@/lib/format.js'
+import { formatShare } from '@/lib/format.js'
 
 /**
  * Кольцо на shadcn/ui Chart (Recharts под капотом). Грузится отдельным
@@ -40,7 +40,7 @@ export default function SharePieChart({ data, size, thickness }) {
                 <div className="flex flex-1 items-center justify-between gap-3">
                   <span className="text-muted-foreground">{name}</span>
                   <span className="font-medium text-foreground tnum">
-                    {formatPct(value, 1)}
+                    {formatShare(value)}
                   </span>
                 </div>
               )}
