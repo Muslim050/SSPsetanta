@@ -4,20 +4,14 @@
  * вписать, сервер принимает любую строку.
  */
 
-// Лиги — те же, что в договорах (LEAGUES), сгруппированные по видам спорта;
-// последней — общая строка лиг вида спорта, как в отчёте.
+// Лиги — те же, что в договорах (LEAGUES), сгруппированные по видам спорта.
+// Несколько лиг в строке отчёта выбирают галочками — сервер хранит их одной
+// строкой через запятую.
 export const SPORT_LEAGUES = {
-  Football: [
-    'EPL',
-    'LaLiga',
-    'Bundesliga',
-    'Ligue 1',
-    'Serie A',
-    'EPL, LaLiga, Ligue 1, Bundesliga, Serie A',
-  ],
-  'MMA Fights': ['UFC', 'Bellator', 'PFL', 'UFC, Bellator, PFL'],
+  Football: ['EPL', 'LaLiga', 'Bundesliga', 'Ligue 1', 'Serie A'],
+  'MMA Fights': ['UFC', 'Bellator', 'PFL'],
   Racing: ['F1'],
-  Tennis: ['ATP', 'WTA', 'WTA, ATP'],
+  Tennis: ['ATP', 'WTA'],
   Basketball: ['NBA'],
   Hockey: ['NHL'],
   Boxing: ['Zuffa Boxing'],
@@ -25,11 +19,21 @@ export const SPORT_LEAGUES = {
 
 export const SPORTS = Object.keys(SPORT_LEAGUES)
 
-const ALL_LEAGUES = [...new Set(Object.values(SPORT_LEAGUES).flat())]
+const ALL_LEAGUES = Object.values(SPORT_LEAGUES).flat()
 
 /** Лиги вида спорта; вид свой, не из списка, — все лиги. */
 export const leaguesFor = (sport) =>
   SPORT_LEAGUES[(sport ?? '').trim()] ?? ALL_LEAGUES
+
+/** Строка лиг сервера («EPL, LaLiga») → список. */
+export const splitLeagues = (text) =>
+  (text ?? '')
+    .split(',')
+    .map((league) => league.trim())
+    .filter(Boolean)
+
+/** Список лиг → строка для сервера. */
+export const joinLeagues = (list) => list.join(', ')
 
 /** Города и области Узбекистана — сначала крупные города. */
 export const UZ_CITIES = [
