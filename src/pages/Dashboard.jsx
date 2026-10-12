@@ -42,12 +42,19 @@ import { PageHeader } from '@/components/PageHeader.jsx'
 import { Card } from '@/components/ui/Card.jsx'
 import { Button } from '@/components/ui/Button'
 import { Combobox } from '@/components/ui/Combobox.jsx'
+import { MultiCombobox } from '@/components/ui/MultiCombobox.jsx'
 import { Loader } from '@/components/ui/Loader.jsx'
 import { SharePie } from '@/components/charts/SharePie.jsx'
 import { colorAt } from '@/components/charts/palette.js'
 import { cn } from '@/lib/cn.js'
 import { uid } from '@/lib/id.js'
-import { leaguesFor, SPORTS, UZ_CITIES } from '@/lib/audienceOptions.js'
+import {
+  joinLeagues,
+  leaguesFor,
+  splitLeagues,
+  SPORTS,
+  UZ_CITIES,
+} from '@/lib/audienceOptions.js'
 import { periodOf, useMonthRange } from '@/lib/useMonthRange.js'
 
 const inputClass =
@@ -334,15 +341,17 @@ function AudienceAgeReport({ data, editing, patch, emptyText }) {
                   </td>
                   <td className="max-w-[270px] px-5 py-3.5 text-[13px] text-ink-soft">
                     {editing ? (
-                      <Combobox
-                        value={row.leagues}
+                      <MultiCombobox
+                        value={splitLeagues(row.leagues)}
                         options={leaguesFor(row.sport)}
-                        placeholder="Лига"
-                        aria-label="Лига"
-                        onChange={(leagues) =>
+                        placeholder="Лиги"
+                        aria-label="Лиги"
+                        onChange={(list) =>
                           patch({
                             leagueAgeRows: leagueAgeRows.map((r) =>
-                              r.id === row.id ? { ...r, leagues } : r,
+                              r.id === row.id
+                                ? { ...r, leagues: joinLeagues(list) }
+                                : r,
                             ),
                           })
                         }

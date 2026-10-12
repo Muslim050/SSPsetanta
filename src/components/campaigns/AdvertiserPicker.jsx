@@ -66,9 +66,9 @@ export function AdvertiserPicker({ advertisers, value, onChange }) {
           onClick={() => onChange('')}
           aria-label="Все рекламодатели"
           title="Все рекламодатели"
-          className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-muted transition-colors hover:bg-ink/6 hover:text-ink focus-ring"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-danger text-white transition-colors hover:bg-danger/50 focus-ring"
         >
-          <X size={14} />
+          <X size={16} />
         </button>
       )}
 
