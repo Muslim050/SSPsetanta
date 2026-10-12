@@ -414,8 +414,9 @@ function TotalMetric({ metric, value }) {
  * статистика просмотров не введена), того карточка не показывает.
  *
  * summary — totalSummary(ответ); null — итоги ещё не пришли (loading) или не
- * загрузились (error). `title` и `actions` (справа от заголовка) — для
- * страницы «Статистика» рекламодателя: у неё свой заголовок и выбор периода.
+ * загрузились (error). `title`, `actions` (справа от заголовка) и
+ * `headerExtra` (под подзаголовком) — для страниц «Статистика»: свой
+ * заголовок, выбор периода и рекламодателя.
  * emptyNote — пояснение под карточками, когда все счётчики пустые; null —
  * без пояснения.
  */
@@ -425,6 +426,7 @@ export function TotalStatisticsReport({
   error = false,
   title = 'Общая статистика размещений',
   actions,
+  headerExtra,
   emptyNote = 'Цифры появятся, когда их заведут на вкладке Spot.',
 }) {
   // Наблюдателю не показываем просмотры, устройства и географию —
@@ -468,15 +470,18 @@ export function TotalStatisticsReport({
         <div className="pointer-events-none absolute -right-20 -top-28 h-64 w-64 rounded-full border border-indigo-300/60" />
         <div className="pointer-events-none absolute right-32 top-0 h-32 w-32 rounded-full bg-indigo-200/50 blur-3xl" />
         <div className="relative flex flex-wrap items-start justify-between gap-3">
-          <ReportHeader
-            eyebrow="Total statistics"
-            title={title}
-            subtitle={
-              isViewer
-                ? 'Сводка эфира и социальных сетей.'
-                : 'Сводка эфира, социальных сетей, устройств и географии аудитории.'
-            }
-          />
+          <div className="min-w-0">
+            <ReportHeader
+              eyebrow="Total statistics"
+              title={title}
+              subtitle={
+                isViewer
+                  ? 'Сводка эфира и социальных сетей.'
+                  : 'Сводка эфира, социальных сетей, устройств и географии аудитории.'
+              }
+            />
+            {headerExtra}
+          </div>
           {actions}
         </div>
         {summary ? (
