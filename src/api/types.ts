@@ -522,10 +522,72 @@ export interface SocialStatistics {
   impressions: number
 }
 
+/** Доли просмотров по устройствам, в процентах. */
+export interface DeviceShares {
+  browser: number
+  tv: number
+  phone: number
+  tablet: number
+}
+
+/** Доля просмотров по городу, в процентах. */
+export interface GeoRow {
+  city: string
+  value: number
+}
+
+/** Доли просмотров по возрасту, в процентах; все пять групп. */
+export interface AgeShares {
+  '13-17': number
+  '18-24': number
+  '25-34': number
+  '35-44': number
+  '45-54': number
+}
+
+/** Возраст зрителей одной лиги. Пара «вид спорта + лига» — не дважды. */
+export interface LeagueRow {
+  sport: string
+  league: string
+  age: AgeShares
+}
+
+/**
+ * Статистика просмотров за месяц — одна на все договоры
+ * (`/reports/:period/views-statistics`). За месяц ничего не ввели — группы
+ * `null`, списки пустые.
+ */
+export interface ViewsStatistics {
+  period: ReportPeriod
+  updatedAt: string | null
+  age: AgeShares | null
+  device: DeviceShares | null
+  leagueRows: LeagueRow[]
+  ottDevice: DeviceShares | null
+  tvDevice: DeviceShares | null
+  geo: GeoRow[]
+}
+
+/** Сохранение статистики просмотров: все группы обязательны, запись целиком. */
+export interface ViewsStatisticsInput {
+  age: AgeShares
+  device: DeviceShares
+  leagueRows: LeagueRow[]
+  ottDevice: DeviceShares
+  tvDevice: DeviceShares
+  geo: GeoRow[]
+}
+
 export interface TotalStatistics {
   totals: StatisticsTotals
   /** Всегда обе сети: instagram и telegram. */
   socials: SocialStatistics[]
+  /**
+   * Устройства и города — из статистики просмотров месяца (одна на все
+   * договоры). Не введена — `device: null`, `geo: []`.
+   */
+  device: DeviceShares | null
+  geo: GeoRow[]
 }
 
 /** Месяц, за который отчёт загружен. */

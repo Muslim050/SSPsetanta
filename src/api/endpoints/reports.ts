@@ -11,6 +11,8 @@ import type {
   ReportSheetCode,
   ReportSheetInput,
   TotalStatistics,
+  ViewsStatistics,
+  ViewsStatisticsInput,
 } from '../types'
 
 /**
@@ -77,6 +79,31 @@ export function totalStatistics(
   return request<TotalStatistics>(
     `${base(contractId)}/${period}/total-statistics`,
   )
+}
+
+/**
+ * GET /reports/:period/views-statistics — статистика просмотров за месяц:
+ * доли по возрасту, устройствам (общие, OTT, TV), возрасту по лигам и
+ * городам. Одна на все договоры. Всегда 200; не ввели — группы null.
+ */
+export function viewsStatistics(
+  period: ReportPeriod,
+): Promise<ViewsStatistics> {
+  return request<ViewsStatistics>(`/reports/${period}/views-statistics`)
+}
+
+/**
+ * POST /reports/:period/views-statistics — заводит статистику месяца или
+ * заменяет прежнюю целиком. Значения — 0…100; ошибки — 400 по полям.
+ */
+export function saveViewsStatistics(
+  period: ReportPeriod,
+  input: ViewsStatisticsInput,
+): Promise<ViewsStatistics> {
+  return request<ViewsStatistics>(`/reports/${period}/views-statistics`, {
+    method: 'POST',
+    body: input,
+  })
 }
 
 /**

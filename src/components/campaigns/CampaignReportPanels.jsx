@@ -21,25 +21,11 @@ import { Card } from '@/components/ui/Card.jsx'
 import { DonutChart } from '@/components/charts/DonutChart.jsx'
 import { cn } from '@/lib/cn.js'
 
-// Устройства и география Total, сохранённые раньше ручной правкой, — в браузере.
-const STATS_STORAGE_KEY = 'setanta.campaign.report-stats.v1'
-
 /** Число из поля: там строка, иногда с пробелами. */
 const statNumber = (value) => {
   const digits = String(value ?? '').replace(/[^\d.-]/g, '')
   const number = Number(digits)
   return Number.isFinite(number) ? number : 0
-}
-
-function loadStats(key, seed) {
-  try {
-    const saved = JSON.parse(localStorage.getItem(STATS_STORAGE_KEY) || '{}')
-    // Сохранённый отчёт мог быть записан до появления новых блоков —
-    // недостающее добираем из сида, иначе панель падает на пустом поле.
-    return saved[key] ? { ...seed, ...saved[key] } : seed
-  } catch {
-    return seed
-  }
 }
 
 /** Число сводки: 14 111 352; значения нет — прочерк. */
@@ -93,37 +79,22 @@ const TOTAL_METRICS = [
   },
 ]
 
-const DEVICE_SHARE = [
-  { label: 'Браузер', value: 3, color: '#4A9BDF' },
-  { label: 'Smart TV', value: 66, color: '#F47B20' },
-  { label: 'Телефон', value: 30, color: '#A3A3A3' },
-  { label: 'Планшет', value: 1, color: '#FFD106' },
+// Устройства в порядке карточки: ключ `device` из итогов → подпись и цвет.
+const DEVICES = [
+  { key: 'browser', label: 'Браузер', color: '#4A9BDF' },
+  { key: 'tv', label: 'Smart TV', color: '#F47B20' },
+  { key: 'phone', label: 'Телефон', color: '#A3A3A3' },
+  { key: 'tablet', label: 'Планшет', color: '#FFD106' },
 ]
 
-const CITY_SHARE = [
-  ['Ташкент', 62.3],
-  ['Самарканд', 12.6],
-  ['Бухара', 7.3],
-  ['Андижан', 2.1],
-  ['Джизак', 2.1],
-  ['Чирчик', 2.1],
-  ['ZZC', 1.8],
-  ['Навои', 1],
-  ['Карши', 1],
-  ['Фергана', 1],
-  ['Наманган', 1],
-  ['Шахрисабз', 0.8],
-  ['Нукус', 0.7],
-  ['Алмалык', 0.7],
-  ['Денау', 0.7],
-  ['Байсун', 0.6],
-  ['Гулистан', 0.6],
-  ['Зарафшан', 0.5],
-  ['Хива', 0.5],
-  ['Хорезмская область', 0.3],
-  ['GHUST', 0.2],
-  ['Коканд', 0.1],
-].map(([name, value]) => ({ name, value }))
+// Колонки ряда карточек под сводкой — по тем, что видны. Классы целиком:
+// Tailwind не собирает их из кусков. Одна карточка — на всю ширину.
+const CARD_COLUMNS = {
+  'social,devices,geo': 'xl:grid-cols-[0.72fr_0.95fr_1.1fr]',
+  'social,devices': 'xl:grid-cols-[0.72fr_0.95fr]',
+  'social,geo': 'xl:grid-cols-[0.72fr_1.1fr]',
+  'devices,geo': 'xl:grid-cols-[0.95fr_1.1fr]',
+}
 
 function ReportHeader({ eyebrow, title, subtitle }) {
   return (
@@ -436,17 +407,11 @@ function TotalMetric({ metric, value }) {
   )
 }
 
-// Вручную в Total ведутся только устройства и география — в файле их нет.
-const TOTAL_SEED = {
-  devices: DEVICE_SHARE.map((item) => ({ ...item })),
-  cities: CITY_SHARE.map((item) => ({ ...item })),
-}
-
 /**
- * Total statistics. Счётчики и соцсети — итоги сервера за месяц
- * (`GET …/total-statistics`): счётчики из ручного отчёта, соцсети из листа
- * файлового. Устройств и географии в API нет: показываем сохранённые раньше
- * или демо-значения, ручной правки здесь нет (docs/reports-backend-tasks.md, R1).
+ * Total statistics — итоги сервера за месяц (`GET …/total-statistics`):
+ * счётчики из ручного отчёта, соцсети из листа файлового, устройства и
+ * города — из статистики просмотров месяца. Чего нет (соцсети без постов,
+ * статистика просмотров не введена), того карточка не показывает.
  *
  * summary — totalSummary(ответ); null — итоги ещё не пришли (loading) или не
  * загрузились (error). `title` и `actions` (справа от заголовка) — для
@@ -465,8 +430,6 @@ export function TotalStatisticsReport({
   // Наблюдателю не показываем просмотры, устройства и географию —
   // остаётся эфирная сводка и социальные сети.
   const { isViewer } = useAuth()
-  // Ручной правки в Total нет: показываем сохранённое раньше или демо.
-  const [data] = useState(() => loadStats('total', TOTAL_SEED))
   const metrics = TOTAL_METRICS.filter(
     (metric) => !(isViewer && metric.viewer === false),
   )
@@ -479,14 +442,25 @@ export function TotalStatisticsReport({
   })
   const showSocial = socialChannels.length > 0
 
-  const devices = data.devices.map((item) => ({
-    ...item,
-    value: statNumber(item.value),
-  }))
-  const topDevice = devices.reduce(
+  // Устройства и города — наблюдателю не показываем; статистика просмотров
+  // за месяц не введена (device null, geo пустой) — карточек нет.
+  const devices = summary?.device
+    ? DEVICES.map(({ key, label, color }) => ({
+        label,
+        color,
+        value: Number(summary.device[key]) || 0,
+      }))
+    : null
+  const cities = summary?.geo ?? []
+  const topDevice = devices?.reduce(
     (top, item) => (!top || item.value > top.value ? item : top),
     null,
   )
+  const cards = [
+    showSocial && 'social',
+    !isViewer && devices && 'devices',
+    !isViewer && cities.length > 0 && 'geo',
+  ].filter(Boolean)
 
   return (
     <div>
@@ -539,28 +513,22 @@ export function TotalStatisticsReport({
           )}
       </section>
 
-      {(showSocial || !isViewer) && (
-        <div
-          className={cn(
-            'mt-4 grid gap-4',
-            !isViewer &&
-              (showSocial
-                ? 'xl:grid-cols-[0.72fr_0.95fr_1.1fr]'
-                : 'xl:grid-cols-[0.95fr_1.1fr]'),
-          )}
-        >
+      {cards.length > 0 && (
+        <div className={cn('mt-4 grid gap-4', CARD_COLUMNS[cards.join(',')])}>
           {showSocial && (
             <Card className="p-5">
               <h4 className="font-display text-base font-semibold text-ink">
                 Социальные сети
               </h4>
               <p className="text-[12px] text-ink-muted">Instagram и Telegram</p>
-              {/* У наблюдателя карточка одна на всю ширину — раскладываем каналы
-              в две колонки, чтобы не тянуть их в высоту. */}
+              {/* Карточка одна на всю ширину (у наблюдателя или без устройств
+              и городов) — раскладываем сети в две колонки, а не в высоту. */}
               <div
                 className={cn(
                   'mt-4',
-                  isViewer ? 'grid gap-3 sm:grid-cols-2' : 'space-y-3',
+                  cards.length === 1
+                    ? 'grid gap-3 sm:grid-cols-2'
+                    : 'space-y-3',
                 )}
               >
                 {socialChannels.map((channel) => {
@@ -609,7 +577,7 @@ export function TotalStatisticsReport({
             </Card>
           )}
 
-          {!isViewer && (
+          {cards.includes('devices') && (
             <Card className="p-5">
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -631,7 +599,7 @@ export function TotalStatisticsReport({
                   centerLabel={topDevice?.label ?? ''}
                 />
                 <div className="w-full space-y-2">
-                  {data.devices.map((item) => (
+                  {devices.map((item) => (
                     <div
                       key={item.label}
                       className="flex items-center gap-2 text-sm"
@@ -642,7 +610,7 @@ export function TotalStatisticsReport({
                       />
                       <span className="text-ink-soft">{item.label}</span>
                       <span className="ml-auto font-semibold text-ink tnum">
-                        {formatPct(statNumber(item.value), 0)}
+                        {formatPct(item.value, 0)}
                       </span>
                     </div>
                   ))}
@@ -651,7 +619,7 @@ export function TotalStatisticsReport({
             </Card>
           )}
 
-          {!isViewer && (
+          {cards.includes('geo') && (
             <Card className="overflow-hidden">
               <div className="flex items-start justify-between gap-3 border-b border-line p-5 pb-4">
                 <div>
@@ -674,7 +642,7 @@ export function TotalStatisticsReport({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-line">
-                    {data.cities.map((city, index) => (
+                    {cities.map((city, index) => (
                       <tr
                         key={`${city.name}-${index}`}
                         className="hover:bg-ink/1.5"
@@ -689,11 +657,11 @@ export function TotalStatisticsReport({
                           <span
                             className="absolute inset-y-1.5 right-3 rounded-md bg-indigo-100"
                             style={{
-                              width: `${Math.max(statNumber(city.value), 4)}%`,
+                              width: `${Math.max(city.value, 4)}%`,
                             }}
                           />
                           <span className="relative font-semibold text-ink tnum">
-                            {formatPct(statNumber(city.value), 2)}
+                            {formatPct(city.value, 2)}
                           </span>
                         </td>
                       </tr>
