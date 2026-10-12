@@ -32,6 +32,7 @@ import {
   audienceToInput,
 } from '@/features/reports/viewsStatistics'
 import { PeriodStatistics } from '@/components/campaigns/PeriodStatistics.jsx'
+import { AdvertiserPicker } from '@/components/campaigns/AdvertiserPicker.jsx'
 import { SegmentTabs } from '@/components/ui/Tabs.jsx'
 import { useToast } from '@/components/ui/Toast.jsx'
 import { useConfirm } from '@/components/ui/Confirm.jsx'
@@ -40,7 +41,6 @@ import { cloneOverview } from '@/lib/overviewSeed.js'
 import { PageHeader } from '@/components/PageHeader.jsx'
 import { Card } from '@/components/ui/Card.jsx'
 import { Button } from '@/components/ui/Button'
-import { Field, Select } from '@/components/ui/Field'
 import { Combobox } from '@/components/ui/Combobox.jsx'
 import { Loader } from '@/components/ui/Loader.jsx'
 import { SharePie } from '@/components/charts/SharePie.jsx'
@@ -945,21 +945,11 @@ export default function Dashboard() {
         loading={header.loading}
         error={header.error}
         filter={
-          <Field label="Рекламодатель">
-            <Select
-              value={advertiserId}
-              onChange={(e) => setAdvertiserId(e.target.value)}
-            >
-              <option value="">Все рекламодатели</option>
-              {[...advertisers]
-                .sort((a, b) => a.name.localeCompare(b.name, 'ru'))
-                .map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
-            </Select>
-          </Field>
+          <AdvertiserPicker
+            advertisers={advertisers}
+            value={advertiserId}
+            onChange={setAdvertiserId}
+          />
         }
       />
 

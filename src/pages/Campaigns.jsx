@@ -585,7 +585,7 @@ export default function Campaigns() {
       <div className="mb-5 space-y-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           {/* Поиск всегда на виду: поле открыто, крестик очищает запрос. */}
-          <div className="relative w-full shrink-0 sm:w-[240px]">
+          <div className="relative w-full shrink-0 sm:w-[250px]">
             <Search
               size={16}
               className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted"
