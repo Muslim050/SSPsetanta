@@ -566,6 +566,11 @@ export interface ViewsStatistics {
   ottDevice: DeviceShares | null
   tvDevice: DeviceShares | null
   geo: GeoRow[]
+  /**
+   * Итоги ручных отчётов месяца по всем договорам — считает сервер, только
+   * чтение; отчётов нет — нули. Пока есть только на проде.
+   */
+  totals?: StatisticsTotals
 }
 
 /** Сохранение статистики просмотров: все группы обязательны, запись целиком. */

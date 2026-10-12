@@ -5,8 +5,10 @@ export function Card({ className, hover = false, ...props }) {
     <div
       className={cn(
         'rounded-2xl border border-line bg-surface shadow-soft overflow-auto',
+        // Карточка, на которую нажимают: при наведении приподнимается и
+        // подсвечивается фирменным жёлтым.
         hover &&
-          'transition-all duration-300 hover:shadow-lift hover:-translate-y-0.5',
+          'transition-all duration-300 hover:-translate-y-0.5 hover:border-indigo-400 hover:shadow-lift',
         className,
       )}
       {...props}

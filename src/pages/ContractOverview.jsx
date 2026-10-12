@@ -657,7 +657,7 @@ export default function ContractOverview() {
                         <Button
                           variant="secondary"
                           size="sm"
-                          className="h-9 w-9 shrink-0 px-0 hover:border-indigo-400 hover:bg-indigo-100 hover:text-ink"
+                          className="h-9 w-9 shrink-0 px-0 hover:border-indigo-500 hover:bg-indigo-500 hover:text-ink"
                           onClick={() => setPreviewId(contract.id)}
                           aria-label={`Открыть договор ${contract.number}`}
                           title="Открыть"
@@ -751,8 +751,8 @@ function StatusMenu({ contract, value, onPick }) {
       <Button
         variant="secondary"
         size="sm"
-        className={`h-9 w-9 shrink-0 px-0 hover:border-indigo-400 hover:bg-indigo-100 hover:text-ink ${
-          open ? 'border-indigo-400 bg-indigo-100' : ''
+        className={`h-9 w-9 shrink-0 px-0 hover:border-indigo-500 hover:bg-indigo-500 hover:text-ink ${
+          open ? 'border-indigo-500 bg-indigo-500' : ''
         }`}
         onClick={(e) => setAnchorEl(open ? null : e.currentTarget)}
         aria-label={`Изменить статус договора ${contract.number}`}
