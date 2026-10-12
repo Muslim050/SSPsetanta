@@ -3,7 +3,8 @@
  *
  * Spot — записи `spots` ручного отчёта (`GET …/manual`, отдельный от
  * файлового), их заводят через `POST …/manual` — см. spotSummary.
- * Total — готовые итоги сервера (`GET …/total-statistics`) — см. totalSummary.
+ * Total — готовые итоги сервера (`GET …/total-statistics`): счётчики, соцсети,
+ * устройства и города — см. totalSummary.
  */
 
 // Каналы Spot: `channel` — канал в ручном отчёте.
@@ -68,6 +69,13 @@ export function totalSummary(data) {
       instagram: byNetwork.instagram ?? empty,
       telegram: byNetwork.telegram ?? empty,
     },
+    // Устройства и города — из статистики просмотров месяца; не введена —
+    // device null, geo пустой: карточки их не покажут.
+    device: data?.device ?? null,
+    geo: (data?.geo ?? []).map((row) => ({
+      name: row.city,
+      value: num(row.value),
+    })),
   }
 }
 

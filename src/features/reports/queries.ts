@@ -12,6 +12,8 @@ import type {
   ReportSheetCode,
   ReportSheetInput,
   TotalStatistics,
+  ViewsStatistics,
+  ViewsStatisticsInput,
 } from '@/api/types'
 
 export const reportKeys = {
@@ -24,6 +26,8 @@ export const reportKeys = {
     [...reportKeys.all, 'manual', contractId, period] as const,
   totalStats: (contractId: number, period: ReportPeriod) =>
     [...reportKeys.all, 'total-stats', contractId, period] as const,
+  viewsStats: (period: ReportPeriod) =>
+    [...reportKeys.all, 'views-stats', period] as const,
   imports: (contractId: number, period: ReportPeriod) =>
     [...reportKeys.all, 'imports', contractId, period] as const,
   /** Ключ загрузки файла — по нему отчёт видит, что идёт разбор. */
@@ -109,6 +113,40 @@ export function useTotalStatistics(
       reportsApi.totalStatistics(contractId as number, period as ReportPeriod),
     enabled: !!contractId && !!period,
     retry: retryServerErrors,
+  })
+}
+
+/** Статистика просмотров за месяц — одна на все договоры. */
+export function useViewsStatistics(period: ReportPeriod | null | undefined) {
+  return useQuery({
+    queryKey: reportKeys.viewsStats(period ?? ''),
+    queryFn: (): Promise<ViewsStatistics> =>
+      reportsApi.viewsStatistics(period as ReportPeriod),
+    enabled: !!period,
+    retry: retryServerErrors,
+  })
+}
+
+/**
+ * Сохранение статистики просмотров за месяц. Ответ кладём в кэш сразу;
+ * итоги Total всех договоров перечитываем — устройства и города в них
+ * берутся отсюда.
+ */
+export function useSaveViewsStatistics() {
+  const client = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      period,
+      input,
+    }: {
+      period: ReportPeriod
+      input: ViewsStatisticsInput
+    }) => reportsApi.saveViewsStatistics(period, input),
+    onSuccess: (stats, { period }) => {
+      client.setQueryData(reportKeys.viewsStats(period), stats)
+      client.invalidateQueries({ queryKey: [...reportKeys.all, 'total-stats'] })
+    },
   })
 }
 
