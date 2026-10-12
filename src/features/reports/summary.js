@@ -43,18 +43,25 @@ export function spotSummary(report) {
   }
 }
 
+/** Число соцсети как есть: `null` остаётся `null` — по нему сеть скрываем. */
+const numOrNull = (value) => (value == null ? null : num(value))
+
 /**
  * Итоги вкладки Total из ответа `total-statistics`: счётчики как есть
  * (`null` — ручного отчёта нет, на карточке прочерк) и соцсети по сети.
+ * Сети, которой нет в ответе, — `null`: карточка её не покажет.
  */
 export function totalSummary(data) {
   const byNetwork = Object.fromEntries(
     (data?.socials ?? []).map((item) => [
       item.network,
-      { posts: num(item.posts), impressions: num(item.impressions) },
+      {
+        posts: numOrNull(item.posts),
+        impressions: numOrNull(item.impressions),
+      },
     ]),
   )
-  const empty = { posts: 0, impressions: 0 }
+  const empty = { posts: null, impressions: null }
   return {
     totals: data?.totals ?? {},
     social: {
