@@ -33,7 +33,7 @@ import { MonthTabs, MONTHS_FULL } from '@/components/campaigns/MonthTabs.jsx'
 import { SegmentTabs } from '@/components/ui/Tabs.jsx'
 import { useToast } from '@/components/ui/Toast.jsx'
 import { useConfirm } from '@/components/ui/Confirm.jsx'
-import { formatPct, formatNumber } from '@/lib/format.js'
+import { formatNumber, formatShare } from '@/lib/format.js'
 import { cloneOverview } from '@/lib/overviewSeed.js'
 import { PageHeader } from '@/components/PageHeader.jsx'
 import { Card } from '@/components/ui/Card.jsx'
@@ -59,15 +59,27 @@ function EditText({ editing, value, onChange, className, children }) {
   )
 }
 
-/** Числовое поле правки — дробные проценты тоже вводятся здесь. */
+/**
+ * Числовое поле правки — дробные проценты тоже вводятся здесь. Пока поле в
+ * фокусе, в нём ровно набранный текст: стёрли — пусто, а не «0», и «0.»
+ * не схлопывается. Ноль показываем пустым полем с подсказкой «0» — вводят
+ * сразу, без стирания. Наверх уходит число, пустое — 0.
+ */
 function EditNumber({ editing, value, onChange, className, children }) {
+  const [text, setText] = useState(null)
   if (!editing) return children
   return (
     <input
       type="number"
       step="any"
-      value={value ?? 0}
-      onChange={(e) => onChange(Number(e.target.value))}
+      inputMode="decimal"
+      placeholder="0"
+      value={text ?? (value ? String(value) : '')}
+      onChange={(e) => {
+        setText(e.target.value)
+        onChange(e.target.value === '' ? 0 : Number(e.target.value))
+      }}
+      onBlur={() => setText(null)}
       className={cn(inputClass, 'tnum text-right', className)}
     />
   )
@@ -125,7 +137,7 @@ function ShareList({ items, editing, onChange, itemClassName }) {
                 )
               }
             >
-              {formatPct(item.value, 0)}
+              {formatShare(item.value)}
             </EditNumber>
           </span>
         </div>
@@ -204,7 +216,7 @@ function AudienceAgeReport({ data, editing, patch, emptyText }) {
                   data={ageShare}
                   size={220}
                   thickness={34}
-                  centerValue={topAge ? formatPct(topAge.value, 0) : '—'}
+                  centerValue={topAge ? formatShare(topAge.value) : '—'}
                   centerLabel={topAge?.label}
                 />
                 <div className="w-full max-w-[280px] space-y-2.5">
@@ -370,7 +382,7 @@ function AudienceAgeReport({ data, editing, patch, emptyText }) {
                         }
                       >
                         <span className="inline-flex min-w-[58px] justify-center rounded-lg border border-line bg-paper/70 px-2 py-1.5">
-                          {formatPct(value, 1)}
+                          {formatShare(value)}
                         </span>
                       </EditNumber>
                     </td>
@@ -453,7 +465,7 @@ function AudienceBreakdown({ data, editing, patch, emptyText }) {
                 data={deviceShare}
                 size={190}
                 thickness={22}
-                centerValue={topDevice ? formatPct(topDevice.value, 0) : '—'}
+                centerValue={topDevice ? formatShare(topDevice.value) : '—'}
                 centerLabel={topDevice?.label}
               />
               <div className="w-full max-w-[250px] space-y-2.5">
@@ -535,7 +547,7 @@ function AudienceBreakdown({ data, editing, patch, emptyText }) {
                           })
                         }
                       >
-                        {formatPct(city.value, 2)}
+                        {formatShare(city.value)}
                       </EditNumber>
                     </span>
                   </td>
@@ -611,7 +623,7 @@ function YoutubeShare({ item, color, editing, onChange }) {
           value={item.value}
           onChange={(value) => onChange({ ...item, value })}
         >
-          {formatPct(item.value, 1)}
+          {formatShare(item.value)}
         </EditNumber>
       </div>
     </div>

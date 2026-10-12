@@ -15,7 +15,7 @@ import { useAuth } from '@/features/auth/useAuth'
 import { useSaveManualReport } from '@/features/reports/queries'
 import { CHANNELS, manualReportInput } from '@/features/reports/summary'
 import { useToast } from '@/components/ui/Toast.jsx'
-import { formatNumber, formatPct } from '@/lib/format.js'
+import { formatNumber, formatShare } from '@/lib/format.js'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card.jsx'
 import { DonutChart } from '@/components/charts/DonutChart.jsx'
@@ -595,7 +595,7 @@ export function TotalStatisticsReport({
                   data={devices}
                   size={190}
                   thickness={22}
-                  centerValue={formatPct(topDevice?.value ?? 0, 0)}
+                  centerValue={formatShare(topDevice?.value ?? 0)}
                   centerLabel={topDevice?.label ?? ''}
                 />
                 <div className="w-full space-y-2">
@@ -610,7 +610,7 @@ export function TotalStatisticsReport({
                       />
                       <span className="text-ink-soft">{item.label}</span>
                       <span className="ml-auto font-semibold text-ink tnum">
-                        {formatPct(item.value, 0)}
+                        {formatShare(item.value)}
                       </span>
                     </div>
                   ))}
@@ -661,7 +661,7 @@ export function TotalStatisticsReport({
                             }}
                           />
                           <span className="relative font-semibold text-ink tnum">
-                            {formatPct(city.value, 2)}
+                            {formatShare(city.value)}
                           </span>
                         </td>
                       </tr>
