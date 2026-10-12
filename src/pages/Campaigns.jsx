@@ -1075,7 +1075,7 @@ export default function Campaigns() {
                         <Button
                           variant="secondary"
                           size="sm"
-                          className="h-9 w-9 shrink-0 px-0"
+                          className="h-9 w-9 shrink-0 px-0 hover:border-indigo-500 hover:bg-indigo-500 hover:text-ink"
                           onClick={() => setPreview(c)}
                           aria-label={`Открыть кампанию ${c.name}`}
                           title="Открыть"
@@ -1088,7 +1088,7 @@ export default function Campaigns() {
                             <Button
                               variant="secondary"
                               size="sm"
-                              className="h-9 w-9 shrink-0 px-0"
+                              className="h-9 w-9 shrink-0 px-0 hover:border-indigo-500 hover:bg-indigo-500 hover:text-ink"
                               onClick={() =>
                                 setModal({ open: true, initial: c })
                               }
