@@ -18,6 +18,33 @@ const BASE_SOCIAL = {
   telegram: { posts: 7, impressions: 307000 },
 }
 
+// Устройства и города — постоянные демо-доли, на период не масштабируются.
+const DEMO_DEVICE = { browser: 3, tv: 66, phone: 30, tablet: 1 }
+const DEMO_GEO = [
+  ['Ташкент', 62.3],
+  ['Самарканд', 12.6],
+  ['Бухара', 7.3],
+  ['Андижан', 2.1],
+  ['Джизак', 2.1],
+  ['Чирчик', 2.1],
+  ['ZZC', 1.8],
+  ['Навои', 1],
+  ['Карши', 1],
+  ['Фергана', 1],
+  ['Наманган', 1],
+  ['Шахрисабз', 0.8],
+  ['Нукус', 0.7],
+  ['Алмалык', 0.7],
+  ['Денау', 0.7],
+  ['Байсун', 0.6],
+  ['Гулистан', 0.6],
+  ['Зарафшан', 0.5],
+  ['Хива', 0.5],
+  ['Хорезмская область', 0.3],
+  ['GHUST', 0.2],
+  ['Коканд', 0.1],
+].map(([name, value]) => ({ name, value }))
+
 /** 'YYYY-MM' → номер месяца от нуля года: так месяцы удобно перебирать. */
 function toIndex(period) {
   const [year, month] = period.split('-').map(Number)
@@ -45,12 +72,12 @@ function emptySummary() {
       { posts: null, impressions: null },
     ]),
   )
-  return { totals, social }
+  return { totals, social, device: null, geo: [] }
 }
 
 /**
  * Сводка за период по месяцам ('YYYY-MM', оба включительно) — в той же
- * форме, что totalSummary: { totals, social }. Период пустой, перевёрнутый
+ * форме, что totalSummary: { totals, social, device, geo }. Период пустой, перевёрнутый
  * или целиком в будущем — значения null.
  */
 export function mockRangeSummary(from, to) {
@@ -78,5 +105,7 @@ export function mockRangeSummary(from, to) {
         { posts: scale(stats.posts), impressions: scale(stats.impressions) },
       ]),
     ),
+    device: DEMO_DEVICE,
+    geo: DEMO_GEO,
   }
 }
