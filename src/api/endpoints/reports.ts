@@ -85,11 +85,15 @@ export function totalStatistics(
  * GET /reports/:period/views-statistics — статистика просмотров за месяц:
  * доли по возрасту, устройствам (общие, OTT, TV), возрасту по лигам и
  * городам. Одна на все договоры. Всегда 200; не ввели — группы null.
+ * `advertiserId` оставляет в `totals` только договоры бренда, доли не меняет.
  */
 export function viewsStatistics(
   period: ReportPeriod,
+  advertiserId?: number | null,
 ): Promise<ViewsStatistics> {
-  return request<ViewsStatistics>(`/reports/${period}/views-statistics`)
+  return request<ViewsStatistics>(
+    `/reports/${period}/views-statistics${buildQuery({ advertiserId })}`,
+  )
 }
 
 /**
