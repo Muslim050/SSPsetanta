@@ -805,20 +805,13 @@ export default function Dashboard() {
   // Рекламодатель для итогов в шапке; пусто — все.
   const { data: advertisers = [] } = useAdvertisers()
   const [advertiserId, setAdvertiserId] = useState('')
-  // Итоги за период — с сервера, сложенные по месяцам: по всем договорам —
-  // из статистики просмотров, у выбранного рекламодателя — total-statistics
-  // его договоров (см. usePeriodTotals).
-  const advertiser = advertisers.find(
-    (item) => String(item.id) === advertiserId,
-  )
+  // Итоги за период — с сервера, сложенные по месяцам (см. usePeriodTotals).
   const header = usePeriodTotals({
     periods: Array.from(
       { length: range.range.to - range.range.from + 1 },
       (_, index) => periodOf(range.year, range.range.from + index),
     ),
-    contractIds: advertiserId
-      ? (advertiser?.contracts ?? []).map((contract) => contract.id)
-      : null,
+    advertiserId: advertiserId ? Number(advertiserId) : null,
   })
 
   // Разделы аудитории — статистика просмотров месяца с сервера (одна на все

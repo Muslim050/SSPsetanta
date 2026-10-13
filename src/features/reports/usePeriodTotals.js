@@ -22,30 +22,22 @@ function sumTotals(list) {
 }
 
 /**
- * Четыре блока «Статистики» за месяцы периода — с сервера, сложенные:
- * - без рекламодателя (`contractIds` = null) — `totals` статистики просмотров
- *   каждого месяца (`views-statistics`): сервер сам складывает ручные отчёты
- *   всех договоров. Тот же запрос грузит аудиторию месяца — кэш общий;
- * - с рекламодателем — `total-statistics` каждого его договора за каждый
- *   месяц: статистика просмотров по рекламодателям не делится.
+ * Четыре блока «Статистики» за месяцы периода — `totals` статистики
+ * просмотров каждого месяца (`views-statistics`), сложенные: сервер сам
+ * складывает ручные отчёты договоров. `advertiserId` — только договоры этого
+ * рекламодателя, null — все. Без рекламодателя запрос тот же, что грузит
+ * аудиторию месяца, — кэш общий.
  *
  * Возвращает summary в форме totalSummary (без соцсетей, устройств и городов —
  * они ниже на странице свои) или null, пока грузится или не загрузилось.
  */
-export function usePeriodTotals({ periods, contractIds }) {
-  const queries =
-    contractIds == null
-      ? periods.map((period) => ({
-          queryKey: reportKeys.viewsStats(period),
-          queryFn: () => reportsApi.viewsStatistics(period),
-        }))
-      : contractIds.flatMap((id) =>
-          periods.map((period) => ({
-            queryKey: reportKeys.totalStats(id, period),
-            queryFn: () => reportsApi.totalStatistics(id, period),
-          })),
-        )
-  const results = useQueries({ queries })
+export function usePeriodTotals({ periods, advertiserId }) {
+  const results = useQueries({
+    queries: periods.map((period) => ({
+      queryKey: reportKeys.viewsStats(period, advertiserId),
+      queryFn: () => reportsApi.viewsStatistics(period, advertiserId),
+    })),
+  })
   const loading = results.some(
     (result) => result.isPending && result.fetchStatus !== 'idle',
   )
