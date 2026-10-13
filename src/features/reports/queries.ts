@@ -26,8 +26,9 @@ export const reportKeys = {
     [...reportKeys.all, 'manual', contractId, period] as const,
   totalStats: (contractId: number, period: ReportPeriod) =>
     [...reportKeys.all, 'total-stats', contractId, period] as const,
-  viewsStats: (period: ReportPeriod) =>
-    [...reportKeys.all, 'views-stats', period] as const,
+  /** advertiserId — итоги только договоров бренда; null — всех. */
+  viewsStats: (period: ReportPeriod, advertiserId: number | null = null) =>
+    [...reportKeys.all, 'views-stats', period, advertiserId] as const,
   imports: (contractId: number, period: ReportPeriod) =>
     [...reportKeys.all, 'imports', contractId, period] as const,
   /** Ключ загрузки файла — по нему отчёт видит, что идёт разбор. */
@@ -275,6 +276,10 @@ export function useSaveManualReport() {
       // Счётчики Total считаются из ручного отчёта.
       client.invalidateQueries({
         queryKey: reportKeys.totalStats(contractId, period),
+      })
+      // Из него же итоги «Статистики» за месяц — всех договоров и по брендам.
+      client.invalidateQueries({
+        queryKey: [...reportKeys.all, 'views-stats', period],
       })
     },
   })
