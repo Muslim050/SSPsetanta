@@ -19,7 +19,8 @@ export const SPORT_LEAGUES = {
 
 export const SPORTS = Object.keys(SPORT_LEAGUES)
 
-const ALL_LEAGUES = Object.values(SPORT_LEAGUES).flat()
+/** Все лиги подряд — для полей без вида спорта. */
+export const ALL_LEAGUES = Object.values(SPORT_LEAGUES).flat()
 
 /** Лиги вида спорта; вид свой, не из списка, — все лиги. */
 export const leaguesFor = (sport) =>

@@ -788,6 +788,7 @@ export function MediaReport({
             >
               {tab === 'stats' ? (
                 <TotalStatisticsReport
+                  upcoming
                   summary={summary}
                   loading={summaryLoading}
                   error={totalStats.isError}
