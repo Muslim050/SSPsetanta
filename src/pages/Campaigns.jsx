@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from '@tanstack/react-router'
+import { getRouteApi, useNavigate } from '@tanstack/react-router'
 import {
   Plus,
   Search,
@@ -103,6 +103,7 @@ const ALL_BRANDS = 'all'
 const toNumber = (value) => Number(value) || 0
 
 const ALL_CONTRACTS = 'all'
+const route = getRouteApi('/app/campaigns')
 const MONTHS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
 
 /** Границы месяца в ISO — с ними и сравниваем период кампании. */
@@ -232,11 +233,21 @@ export default function Campaigns() {
 
   const [q, setQ] = useState('')
   const [status, setStatus] = useState('all')
-  const [brandId, setBrandId] = useState(ALL_BRANDS)
-  const [contract, setContract] = useState(ALL_CONTRACTS)
-  const [year, setYear] = useState(() => new Date().getFullYear())
+  // Бренд, договор, год, месяц и вкладки — в адресе (см. CampaignsSearch в
+  // router): после перезагрузки откроется то же место. Пустой параметр —
+  // значение по умолчанию; адрес меняем без новой записи в истории.
+  const search = route.useSearch()
+  const setSearch = (patch) =>
+    navigate({
+      to: '/app/campaigns',
+      search: (prev) => ({ ...prev, ...patch }),
+      replace: true,
+    })
+  const brandId = search.brand ?? ALL_BRANDS
+  const contract = search.contract ?? ALL_CONTRACTS
+  const year = search.year ?? new Date().getFullYear()
   // Месяц не выбран — таблица показывает кампании за все периоды.
-  const [month, setMonth] = useState(null)
+  const month = search.month != null ? search.month - 1 : null
   const [contractModal, setContractModal] = useState(null)
   const [modal, setModal] = useState({ open: false, initial: null })
   const [preview, setPreview] = useState(null)
@@ -245,7 +256,7 @@ export default function Campaigns() {
   // Карточка, у которой открыт поповер со сменой статуса оплаты.
   const [statusAnchor, setStatusAnchor] = useState(null)
   // Вкладка внутри месяца: статистика или кампании. null — по умолчанию.
-  const [monthTab, setMonthTab] = useState(null)
+  const monthTab = search.view ?? null
 
   // Суммы переехали на договор — в таблице кампаний колонки бюджета нет.
   const showBudget = false
@@ -402,15 +413,40 @@ export default function Campaigns() {
     : null
 
   /**
-   * Смена бренда — это новый контекст: договоры у него свои, а период
-   * возвращаем к текущему месяцу, чтобы не смотреть чужой отчёт.
+   * Смена бренда — это новый контекст: договоры у него свои, период
+   * сбрасываем, чтобы не смотреть чужой отчёт. Месяц появится в адресе
+   * вместе с договором (см. selectContract).
    */
-  const selectBrand = (id) => {
-    setBrandId(id)
-    setContract(ALL_CONTRACTS)
-    setYear(new Date().getFullYear())
-    setMonth(new Date().getMonth())
-  }
+  const selectBrand = (id) =>
+    setSearch({
+      brand: id === ALL_BRANDS ? undefined : id,
+      contract: undefined,
+      year: undefined,
+      month: undefined,
+      view: undefined,
+      tab: undefined,
+    })
+
+  /**
+   * Выбор договора. Месяцы видны только при договоре: площадке открываем
+   * текущий, если месяц ещё не выбран. Сняли договор — снимаем и период.
+   */
+  const selectContract = (value) =>
+    value === activeContract
+      ? setSearch({
+          contract: undefined,
+          year: undefined,
+          month: undefined,
+          view: undefined,
+          tab: undefined,
+        })
+      : setSearch({
+          contract: value,
+          month:
+            search.month ??
+            (isAdvertiser ? undefined : new Date().getMonth() + 1),
+          tab: undefined,
+        })
 
   /**
    * Суммы договора. Прирост «Оплачено» сервер сам оформляет поступлением
@@ -662,9 +698,7 @@ export default function Campaigns() {
             <SegmentTabs
               tone="soft"
               value={activeContract}
-              onChange={(value) =>
-                setContract(value === activeContract ? ALL_CONTRACTS : value)
-              }
+              onChange={selectContract}
               items={contractTabs}
             />
           )}
@@ -826,12 +860,15 @@ export default function Campaigns() {
           <MonthTabs
             year={activeYear}
             years={years}
-            onYearChange={setYear}
+            onYearChange={(value) => setSearch({ year: value })}
             value={activeMonth}
-            onChange={(value) => {
-              setMonthTab(null)
-              setMonth(value)
-            }}
+            onChange={(value) =>
+              setSearch({
+                month: value == null ? undefined : value + 1,
+                view: undefined,
+                tab: undefined,
+              })
+            }
             counts={monthCounts}
             statuses={monthStatuses}
           />
@@ -843,7 +880,7 @@ export default function Campaigns() {
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <SegmentTabs
             value={monthView}
-            onChange={setMonthTab}
+            onChange={(value) => setSearch({ view: value })}
             items={[
               { value: 'campaigns', label: 'Кампании', count: filtered.length },
               { value: 'stats', label: 'Статистика' },
@@ -1139,6 +1176,10 @@ export default function Campaigns() {
             key={`${selectedContract?.id ?? 'all'}-${activeYear}-${activeMonth}`}
             contractId={selectedContract?.id}
             period={periodKey(activeYear, activeMonth)}
+            tab={search.tab}
+            onTabChange={(value) =>
+              setSearch({ tab: value === 'channels' ? undefined : value })
+            }
           />
         </section>
       )}

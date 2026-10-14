@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useId, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useMutationState } from '@tanstack/react-query'
 import {
@@ -645,8 +645,14 @@ export function MediaReport({
   contractId,
   period,
   emptyHint = 'Выберите договор — отчёт из файла статистики ведётся по договору.',
+  tab: tabProp,
+  onTabChange,
 }) {
-  const [tab, setTab] = useState('channels')
+  // Вкладку может вести родитель (у «Рекламных размещений» она в адресе),
+  // иначе — своя.
+  const [ownTab, setOwnTab] = useState('channels')
+  const wanted = tabProp ?? (onTabChange ? 'channels' : ownTab)
+  const setTab = onTabChange ?? setOwnTab
   // Сколько раз за месяц загружали файл — по нему проявление играет заново.
   const [reveal, setReveal] = useState(0)
   // Идёт ли разбор файла и какого — из состояния загрузки, её запускает
@@ -696,15 +702,11 @@ export function MediaReport({
     contractId ?? 'default',
     reportGroups,
   )
+  // Вкладки нет (у месяца нет файла, отчёт ещё грузится или лист пустой) —
+  // показываем сводку. Выбор не сбрасываем: после перезагрузки адрес хранит
+  // лист, а листы приходят позже — тогда он и откроется.
+  const tab = tabs.some((item) => item.value === wanted) ? wanted : 'channels'
   const current = tabs.find((item) => item.value === tab)
-
-  // Открытая вкладка могла исчезнуть: сменился договор, месяц или у месяца
-  // нет файла — возвращаемся к сводке.
-  const tabKeys = tabs.map((item) => item.value).join('|')
-  useEffect(() => {
-    if (!tabs.some((item) => item.value === tab)) setTab('channels')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tabKeys])
 
   // Категорию открываем сразу на её первом канале.
   const createCategory = (name) => {
@@ -788,7 +790,6 @@ export function MediaReport({
             >
               {tab === 'stats' ? (
                 <TotalStatisticsReport
-                  upcoming
                   summary={summary}
                   loading={summaryLoading}
                   error={totalStats.isError}
