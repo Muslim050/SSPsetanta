@@ -468,6 +468,11 @@ export interface SpotReport {
   liveCount: number
   liveSeconds: number
   liveViews: number
+  /**
+   * Лиги Live spot строкой через запятую («EPL, UFC»). Сервер поля пока не
+   * хранит — ждёт бэка.
+   */
+  liveLeagues?: string
 }
 
 /**

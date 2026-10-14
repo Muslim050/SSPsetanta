@@ -1,8 +1,11 @@
 import { useState } from 'react'
 import {
+  Clapperboard,
   Instagram,
   MapPin,
+  MonitorPlay,
   MonitorSmartphone,
+  Radio,
   Pencil,
   PlayCircle,
   RadioTower,
@@ -14,6 +17,12 @@ import {
 import { useAuth } from '@/features/auth/useAuth'
 import { useSaveManualReport } from '@/features/reports/queries'
 import { CHANNELS, manualReportInput } from '@/features/reports/summary'
+import {
+  ALL_LEAGUES,
+  joinLeagues,
+  splitLeagues,
+} from '@/lib/audienceOptions.js'
+import { MultiCombobox } from '@/components/ui/MultiCombobox.jsx'
 import { useToast } from '@/components/ui/Toast.jsx'
 import { formatNumber, formatShare } from '@/lib/format.js'
 import { Button } from '@/components/ui/Button'
@@ -65,9 +74,17 @@ const SOCIAL_CHANNELS = [
 ]
 
 // Карточки Total — ключи итогов `total-statistics` (из ручного отчёта).
+// upcoming — карточки на будущее: сервер их итогов пока не считает, на них
+// прочерк; показываем только в отчёте договора.
 const TOTAL_METRICS = [
   // Выходы рекламы в прямых эфирах SS1 + SS2.
   { key: 'liveCount', label: 'Прямые эфиры', icon: RadioTower },
+  {
+    key: 'standardCount',
+    label: 'Standard Spot',
+    icon: Clapperboard,
+    upcoming: true,
+  },
   { key: 'eventPromoCount', label: 'Промо в эфире', icon: Tv },
   { key: 'totalSeconds', label: 'Хронометраж, сек.', icon: Timer },
   // Наблюдателю просмотры не показываем — как и в таблице размещений.
@@ -77,6 +94,13 @@ const TOTAL_METRICS = [
     icon: PlayCircle,
     viewer: false,
   },
+  {
+    key: 'ottPrerollViews',
+    label: 'OTT Preroll',
+    icon: MonitorPlay,
+    upcoming: true,
+  },
+  { key: 'ottLiveViews', label: 'OTT Live', icon: Radio, upcoming: true },
 ]
 
 // Устройства в порядке карточки: ключ `device` из итогов → подпись и цвет.
@@ -131,6 +155,13 @@ function SummaryEmpty({
   )
 }
 
+// Лиги Live spot, пока их не выбрали.
+const DEFAULT_LIVE_LEAGUES = 'UFC / Football'
+
+/**
+ * Карточка цифры Spot. `league` — у Live spot: лиги строкой, в подписи
+ * карточки; при правке их выбирают из списка (`onLeagueChange`).
+ */
 function ChannelMetric({
   label,
   value,
@@ -138,6 +169,8 @@ function ChannelMetric({
   accent = 'coral',
   editing = false,
   onChange,
+  league,
+  onLeagueChange,
 }) {
   const accentClass =
     accent === 'green'
@@ -148,7 +181,22 @@ function ChannelMetric({
     <div className={`rounded-2xl border p-4 shadow-soft ${accentClass}`}>
       <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-muted">
         {label}
+        {league !== undefined &&
+          !editing &&
+          ` ${league || DEFAULT_LIVE_LEAGUES}`}
       </p>
+      {editing && onLeagueChange && (
+        <div className="mt-2">
+          <MultiCombobox
+            value={splitLeagues(league)}
+            options={ALL_LEAGUES}
+            placeholder="Выберите лиги"
+            aria-label={`${label}: лиги`}
+            onChange={(list) => onLeagueChange(joinLeagues(list))}
+            className="text-[13px]"
+          />
+        </div>
+      )}
       {editing ? (
         <StatInput
           value={value}
@@ -192,7 +240,9 @@ function ChannelPanel({ channel, editing, onChange }) {
           onChange={set('standardSpots')}
         />
         <ChannelMetric
-          label="Live spot UFC / Football"
+          label="Live spot"
+          league={channel.liveLeagues}
+          onLeagueChange={set('liveLeagues')}
           value={channel.liveAds}
           unit="Live Ads"
           editing={editing}
@@ -206,7 +256,9 @@ function ChannelPanel({ channel, editing, onChange }) {
           onChange={set('standardSeconds')}
         />
         <ChannelMetric
-          label="Live spot UFC / Football"
+          label="Live spot"
+          league={channel.liveLeagues}
+          onLeagueChange={set('liveLeagues')}
           value={channel.liveSeconds}
           unit="секунд"
           editing={editing}
@@ -239,6 +291,7 @@ const emptyDraft = () => ({
     liveAds: null,
     liveSeconds: null,
     liveViews: null,
+    liveLeagues: '',
   })),
   eventPromo: null,
   ottPreroll: null,
@@ -388,10 +441,39 @@ export function ChannelSummaryReport({
   )
 }
 
-function TotalMetric({ metric, value }) {
+// Ширина карточки Total в сетке из 12 колонок — классы целиком для Tailwind.
+const METRIC_SPAN = {
+  3: 'lg:col-span-3',
+  4: 'lg:col-span-4',
+  6: 'lg:col-span-6',
+  12: 'lg:col-span-12',
+}
+
+/**
+ * Ширина каждой карточки Total: на широком экране по четыре в ряд (три —
+ * одним рядом), неполный последний ряд растягивается на всю ширину. На
+ * телефоне по две, одинокая последняя — во всю ширину.
+ */
+function metricSpans(count) {
+  const perRow = count === 3 ? 3 : 4
+  const full = Math.floor(count / perRow) * perRow
+  return Array.from({ length: count }, (_, index) =>
+    cn(
+      METRIC_SPAN[12 / (index < full ? perRow : count - full)],
+      count % 2 === 1 && index === count - 1 && 'col-span-2',
+    ),
+  )
+}
+
+function TotalMetric({ metric, value, className }) {
   const Icon = metric.icon
   return (
-    <div className="rounded-2xl border border-line bg-surface/85 p-4 shadow-soft">
+    <div
+      className={cn(
+        'rounded-2xl border border-line bg-surface/85 p-4 shadow-soft',
+        className,
+      )}
+    >
       <div className="flex items-center justify-between gap-3">
         <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-ink-muted">
           {metric.label}
@@ -416,7 +498,8 @@ function TotalMetric({ metric, value }) {
  * summary — totalSummary(ответ); null — итоги ещё не пришли (loading) или не
  * загрузились (error). `title`, `actions` (справа от заголовка) и
  * `headerExtra` (под подзаголовком) — для страниц «Статистика»: свой
- * заголовок, выбор периода и рекламодателя.
+ * заголовок, выбор периода и рекламодателя. `upcoming` — показать и
+ * карточки, итогов которых сервер ещё не считает (в отчёте договора).
  * emptyNote — пояснение под карточками, когда все счётчики пустые; null —
  * без пояснения.
  */
@@ -427,14 +510,18 @@ export function TotalStatisticsReport({
   title = 'Общая статистика размещений',
   actions,
   headerExtra,
+  upcoming = false,
   emptyNote = 'Цифры появятся, когда их заведут на вкладке Spot.',
 }) {
   // Наблюдателю не показываем просмотры, устройства и географию —
   // остаётся эфирная сводка и социальные сети.
   const { isViewer } = useAuth()
   const metrics = TOTAL_METRICS.filter(
-    (metric) => !(isViewer && metric.viewer === false),
+    (metric) =>
+      !(isViewer && metric.viewer === false) && (upcoming || !metric.upcoming),
   )
+
+  const spans = metricSpans(metrics.length)
 
   // Соцсеть без данных (null или нули — файла за месяц нет) не показываем;
   // пусты обе — карточки «Социальные сети» нет вовсе.
@@ -485,17 +572,13 @@ export function TotalStatisticsReport({
           {actions}
         </div>
         {summary ? (
-          <div
-            className={cn(
-              'relative mt-6 grid grid-cols-2 gap-3',
-              isViewer ? 'lg:grid-cols-3' : 'lg:grid-cols-4',
-            )}
-          >
-            {metrics.map((metric) => (
+          <div className="relative mt-6 grid grid-cols-2 gap-3 lg:grid-cols-12">
+            {metrics.map((metric, index) => (
               <TotalMetric
                 key={metric.key}
                 metric={metric}
-                value={summary.totals[metric.key]}
+                className={spans[index]}
+                value={metric.upcoming ? null : summary.totals[metric.key]}
               />
             ))}
           </div>
