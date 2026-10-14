@@ -69,9 +69,50 @@ const appIndexRoute = createRoute({
   },
 })
 
+/**
+ * Выбор на «Рекламных размещениях» живёт в адресе — после перезагрузки или
+ * по ссылке откроется тот же бренд, договор, месяц и вкладка отчёта:
+ * `?brand=12&contract=№20-02.2025&year=2026&month=1&view=stats&tab=total`.
+ * month — 1…12, как в календаре. Чего нет или значение кривое — параметра
+ * нет; на существование бренда и договора проверяет сама страница.
+ */
+export interface CampaignsSearch {
+  brand?: number
+  contract?: string
+  year?: number
+  month?: number
+  view?: 'stats' | 'campaigns'
+  tab?: string
+}
+
+const positiveInt = (value: unknown) => {
+  const number = Number(value)
+  return Number.isInteger(number) && number > 0 ? number : undefined
+}
+
+// Номер договора бывает и из одних цифр — роутер прочтёт его числом.
+const text = (value: unknown) =>
+  (typeof value === 'string' || typeof value === 'number') && value !== ''
+    ? String(value)
+    : undefined
+
 const campaignsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: 'campaigns',
+  validateSearch: (search: Record<string, unknown>): CampaignsSearch => {
+    const month = positiveInt(search.month)
+    return {
+      brand: positiveInt(search.brand),
+      contract: text(search.contract),
+      year: positiveInt(search.year),
+      month: month && month <= 12 ? month : undefined,
+      view:
+        search.view === 'stats' || search.view === 'campaigns'
+          ? search.view
+          : undefined,
+      tab: text(search.tab),
+    }
+  },
   component: Campaigns,
 })
 
