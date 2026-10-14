@@ -37,6 +37,8 @@ export function spotSummary(report) {
         liveAds: num(spot.liveCount),
         liveSeconds: num(spot.liveSeconds),
         liveViews: num(spot.liveViews),
+        // Лиги Live spot строкой через запятую; сервер пока не хранит.
+        liveLeagues: spot.liveLeagues ?? '',
       }
     }),
     eventPromo: report.eventPromoCount ?? null,
@@ -94,6 +96,7 @@ export function manualReportInput({ channels, eventPromo, ottPreroll }) {
       liveCount: num(channel.liveAds),
       liveSeconds: num(channel.liveSeconds),
       liveViews: num(channel.liveViews),
+      liveLeagues: channel.liveLeagues ?? '',
     })),
   }
 }
