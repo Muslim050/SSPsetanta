@@ -75,7 +75,7 @@ const SOCIAL_CHANNELS = [
 
 // Карточки Total — ключи итогов `total-statistics` (из ручного отчёта).
 // upcoming — карточки на будущее: сервер их итогов пока не считает, на них
-// прочерк; показываем только в отчёте договора.
+// прочерк.
 const TOTAL_METRICS = [
   // Выходы рекламы в прямых эфирах SS1 + SS2.
   { key: 'liveCount', label: 'Прямые эфиры', icon: RadioTower },
@@ -408,7 +408,7 @@ export function ChannelSummaryReport({
             ))}
           </div>
 
-          <div className="relative mt-4 grid gap-4 sm:grid-cols-2">
+          <div className="relative mt-4 grid gap-4 sm:grid-cols-3">
             <ChannelMetric
               label="TV Event Promo Count"
               value={shown.eventPromo}
@@ -428,6 +428,13 @@ export function ChannelSummaryReport({
               onChange={(ottPreroll) =>
                 setDraft((current) => ({ ...current, ottPreroll }))
               }
+            />
+            {/* OTT Live сервер пока не хранит — карточка без цифр и без правки. */}
+            <ChannelMetric
+              label="OTT Live Views"
+              value={null}
+              unit="просмотров"
+              accent="green"
             />
           </div>
         </>
@@ -498,8 +505,7 @@ function TotalMetric({ metric, value, className }) {
  * summary — totalSummary(ответ); null — итоги ещё не пришли (loading) или не
  * загрузились (error). `title`, `actions` (справа от заголовка) и
  * `headerExtra` (под подзаголовком) — для страниц «Статистика»: свой
- * заголовок, выбор периода и рекламодателя. `upcoming` — показать и
- * карточки, итогов которых сервер ещё не считает (в отчёте договора).
+ * заголовок, выбор периода и рекламодателя.
  * emptyNote — пояснение под карточками, когда все счётчики пустые; null —
  * без пояснения.
  */
@@ -510,15 +516,13 @@ export function TotalStatisticsReport({
   title = 'Общая статистика размещений',
   actions,
   headerExtra,
-  upcoming = false,
   emptyNote = 'Цифры появятся, когда их заведут на вкладке Spot.',
 }) {
   // Наблюдателю не показываем просмотры, устройства и географию —
   // остаётся эфирная сводка и социальные сети.
   const { isViewer } = useAuth()
   const metrics = TOTAL_METRICS.filter(
-    (metric) =>
-      !(isViewer && metric.viewer === false) && (upcoming || !metric.upcoming),
+    (metric) => !(isViewer && metric.viewer === false),
   )
 
   const spans = metricSpans(metrics.length)
