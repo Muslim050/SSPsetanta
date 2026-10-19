@@ -6,3 +6,6 @@ dist-ssr
 .env
 .env.*
 !.env.example
+
+# Бэкапы scripts/copy-month-statistics.mjs
+copy-month-statistics.backup-*.json

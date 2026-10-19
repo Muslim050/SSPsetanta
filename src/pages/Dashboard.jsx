@@ -163,8 +163,11 @@ function RemoveRow({ label, onClick }) {
   )
 }
 
-// Подписи колонок возраста — в порядке AGE_KEYS.
-const AGE_COLUMNS = AGE_KEYS.map((key) => `${key.replace('-', '–')} y.o.`)
+// Колонки возраста в таблице лиг — в порядке AGE_KEYS, без 13–17
+// (значение группы остаётся в row.ages и уходит на сервер как было).
+const AGE_COLUMNS = AGE_KEYS.flatMap((key, index) =>
+  key === '13-17' ? [] : [{ index, label: `${key.replace('-', '–')} y.o.` }],
+)
 
 function AudienceAgeReport({ data, editing, patch, emptyText }) {
   const { audience, ageShare, platformDeviceShare, leagueAgeRows } = data
@@ -299,7 +302,7 @@ function AudienceAgeReport({ data, editing, patch, emptyText }) {
               <tr className="text-[11px] font-semibold uppercase tracking-wider">
                 <th className="px-5 py-3 text-left">Sport</th>
                 <th className="px-5 py-3 text-left">League</th>
-                {AGE_COLUMNS.map((label) => (
+                {AGE_COLUMNS.map(({ label }) => (
                   <th key={label} className="px-4 py-3 text-center">
                     {label}
                   </th>
@@ -360,14 +363,14 @@ function AudienceAgeReport({ data, editing, patch, emptyText }) {
                       row.leagues
                     )}
                   </td>
-                  {row.ages.map((value, index) => (
+                  {AGE_COLUMNS.map(({ index }) => (
                     <td
                       key={`${row.id}-${index}`}
                       className="px-4 py-3.5 text-center font-semibold text-ink tnum"
                     >
                       <EditNumber
                         editing={editing}
-                        value={value}
+                        value={row.ages[index]}
                         onChange={(next) =>
                           patch({
                             leagueAgeRows: leagueAgeRows.map((r) =>
@@ -384,7 +387,7 @@ function AudienceAgeReport({ data, editing, patch, emptyText }) {
                         }
                       >
                         <span className="inline-flex min-w-[58px] justify-center rounded-lg border border-line bg-paper/70 px-2 py-1.5">
-                          {formatShare(value)}
+                          {formatShare(row.ages[index])}
                         </span>
                       </EditNumber>
                     </td>
