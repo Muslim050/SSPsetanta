@@ -16,6 +16,7 @@
  * месяцев сохраняются в `copy-month-statistics.backup-<время>.json`.
  */
 import { writeFileSync } from 'node:fs'
+import { API_TARGET } from './api-target.mjs'
 
 const args = process.argv.slice(2)
 const arg = (name, fallback) => {
@@ -23,7 +24,7 @@ const arg = (name, fallback) => {
   return index === -1 ? fallback : args[index + 1]
 }
 
-const API = arg('api', 'https://setanta.pythonanywhere.com') + '/api/v1'
+const API = arg('api', API_TARGET) + '/api/v1'
 const LOGIN = arg('login', process.env.SETANTA_LOGIN)
 const PASSWORD = arg('password', process.env.SETANTA_PASSWORD)
 const FROM = arg('from', '2026-10')
@@ -86,6 +87,9 @@ const viewsInput = (stats) => ({
 const manualInput = (report) => ({
   eventPromoCount: report.eventPromoCount ?? null,
   ottPrerollViews: report.ottPrerollViews ?? null,
+  ...(report.ottLiveViews !== undefined
+    ? { ottLiveViews: report.ottLiveViews }
+    : {}),
   spots: (report.spots ?? []).map((spot) => ({
     channel: spot.channel,
     standardCount: spot.standardCount,
@@ -93,7 +97,12 @@ const manualInput = (report) => ({
     liveCount: spot.liveCount,
     liveSeconds: spot.liveSeconds,
     liveViews: spot.liveViews,
-    ...(spot.liveLeagues != null ? { liveLeagues: spot.liveLeagues } : {}),
+    ...(spot.liveCountLeague != null
+      ? { liveCountLeague: spot.liveCountLeague }
+      : {}),
+    ...(spot.liveSecondsLeague != null
+      ? { liveSecondsLeague: spot.liveSecondsLeague }
+      : {}),
   })),
 })
 

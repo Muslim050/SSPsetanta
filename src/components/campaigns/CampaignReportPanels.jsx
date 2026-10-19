@@ -74,17 +74,12 @@ const SOCIAL_CHANNELS = [
 ]
 
 // Карточки Total — ключи итогов `total-statistics` (из ручного отчёта).
-// upcoming — карточки на будущее: сервер их итогов пока не считает, на них
-// прочерк.
+// Standard Spot и OTT сервер считает пока только на стейджинге — где полей
+// нет, на карточках прочерк.
 const TOTAL_METRICS = [
   // Выходы рекламы в прямых эфирах SS1 + SS2.
   { key: 'liveCount', label: 'Прямые эфиры', icon: RadioTower },
-  {
-    key: 'standardCount',
-    label: 'Standard Spot',
-    icon: Clapperboard,
-    upcoming: true,
-  },
+  { key: 'standardCount', label: 'Standard Spot', icon: Clapperboard },
   { key: 'eventPromoCount', label: 'Промо в эфире', icon: Tv },
   { key: 'totalSeconds', label: 'Хронометраж, сек.', icon: Timer },
   // Наблюдателю просмотры не показываем — как и в таблице размещений.
@@ -94,13 +89,8 @@ const TOTAL_METRICS = [
     icon: PlayCircle,
     viewer: false,
   },
-  {
-    key: 'ottPrerollViews',
-    label: 'OTT Preroll',
-    icon: MonitorPlay,
-    upcoming: true,
-  },
-  { key: 'ottLiveViews', label: 'OTT Live', icon: Radio, upcoming: true },
+  { key: 'ottPrerollViews', label: 'OTT Preroll', icon: MonitorPlay },
+  { key: 'ottLiveViews', label: 'OTT Live', icon: Radio },
 ]
 
 // Устройства в порядке карточки: ключ `device` из итогов → подпись и цвет.
@@ -241,8 +231,8 @@ function ChannelPanel({ channel, editing, onChange }) {
         />
         <ChannelMetric
           label="Live spot"
-          league={channel.liveLeagues}
-          onLeagueChange={set('liveLeagues')}
+          league={channel.liveCountLeagues}
+          onLeagueChange={set('liveCountLeagues')}
           value={channel.liveAds}
           unit="Live Ads"
           editing={editing}
@@ -257,8 +247,8 @@ function ChannelPanel({ channel, editing, onChange }) {
         />
         <ChannelMetric
           label="Live spot"
-          league={channel.liveLeagues}
-          onLeagueChange={set('liveLeagues')}
+          league={channel.liveSecondsLeagues}
+          onLeagueChange={set('liveSecondsLeagues')}
           value={channel.liveSeconds}
           unit="секунд"
           editing={editing}
@@ -291,10 +281,12 @@ const emptyDraft = () => ({
     liveAds: null,
     liveSeconds: null,
     liveViews: null,
-    liveLeagues: '',
+    liveCountLeagues: '',
+    liveSecondsLeagues: '',
   })),
   eventPromo: null,
   ottPreroll: null,
+  ottLive: null,
 })
 
 /**
@@ -333,6 +325,7 @@ export function ChannelSummaryReport({
             channels: spot.channels.map((channel) => ({ ...channel })),
             eventPromo: spot.eventPromo,
             ottPreroll: spot.ottPreroll,
+            ottLive: spot.ottLive,
           }
         : emptyDraft(),
     )
@@ -429,12 +422,15 @@ export function ChannelSummaryReport({
                 setDraft((current) => ({ ...current, ottPreroll }))
               }
             />
-            {/* OTT Live сервер пока не хранит — карточка без цифр и без правки. */}
             <ChannelMetric
               label="OTT Live Views"
-              value={null}
+              value={shown.ottLive}
               unit="просмотров"
               accent="green"
+              editing={editing}
+              onChange={(ottLive) =>
+                setDraft((current) => ({ ...current, ottLive }))
+              }
             />
           </div>
         </>
@@ -582,7 +578,7 @@ export function TotalStatisticsReport({
                 key={metric.key}
                 metric={metric}
                 className={spans[index]}
-                value={metric.upcoming ? null : summary.totals[metric.key]}
+                value={summary.totals[metric.key]}
               />
             ))}
           </div>
