@@ -17,6 +17,7 @@
  * Удаления у кампаний в API нет: `--dry` показывает план, ничего не создавая.
  */
 import { buildSeed } from '../src/lib/seed.js'
+import { API_TARGET } from './api-target.mjs'
 
 const args = process.argv.slice(2)
 const arg = (name, fallback) => {
@@ -24,7 +25,7 @@ const arg = (name, fallback) => {
   return index === -1 ? fallback : args[index + 1]
 }
 
-const API = arg('api', 'https://setanta.pythonanywhere.com') + '/api/v1'
+const API = arg('api', API_TARGET) + '/api/v1'
 const LOGIN = arg('login', 'admin')
 const PASSWORD = arg('password', 'admin')
 const PER_BRAND = Number(arg('per-brand', 20)) || 20

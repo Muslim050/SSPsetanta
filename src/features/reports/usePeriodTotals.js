@@ -2,7 +2,15 @@ import { useQueries } from '@tanstack/react-query'
 import * as reportsApi from '@/api/endpoints/reports'
 import { reportKeys } from '@/features/reports/queries'
 
-const KEYS = ['liveCount', 'eventPromoCount', 'totalSeconds', 'liveViews']
+const KEYS = [
+  'liveCount',
+  'standardCount',
+  'eventPromoCount',
+  'totalSeconds',
+  'liveViews',
+  'ottPrerollViews',
+  'ottLiveViews',
+]
 
 /** Итоги месяцев в один: значение есть хоть за один месяц — сумма, иначе null. */
 function sumTotals(list) {
