@@ -469,10 +469,11 @@ export interface SpotReport {
   liveSeconds: number
   liveViews: number
   /**
-   * Лиги Live spot строкой через запятую («EPL, UFC»). Сервер поля пока не
-   * хранит — ждёт бэка.
+   * Лиги Live spot строкой через запятую («EPL, UFC») — у выходов и у секунд
+   * свои. Пока есть только на стейджинге.
    */
-  liveLeagues?: string
+  liveCountLeague?: string
+  liveSecondsLeague?: string
 }
 
 /**
@@ -483,6 +484,8 @@ export interface SpotReport {
 export interface ManualReportInput {
   eventPromoCount: number | null
   ottPrerollViews: number | null
+  /** Просмотры рекламы в прямых эфирах OTT. Пока есть только на стейджинге. */
+  ottLiveViews?: number | null
   spots: SpotReport[]
 }
 
@@ -499,6 +502,7 @@ export interface Report {
   reportType?: ReportType
   eventPromoCount?: number | null
   ottPrerollViews?: number | null
+  ottLiveViews?: number | null
   updatedAt: string
   sheets: ReportSheet[]
   spots?: SpotReport[]
@@ -519,6 +523,12 @@ export interface StatisticsTotals {
   totalSeconds: number | null
   /** Просмотры рекламы в прямых эфирах, SS1 + SS2. */
   liveViews: number | null
+  // Ниже — пока только на стейджинге; на проде полей нет.
+  /** Обычные выходы роликов, SS1 + SS2. */
+  standardCount?: number | null
+  ottPrerollViews?: number | null
+  /** Просмотры рекламы в прямых эфирах OTT. */
+  ottLiveViews?: number | null
 }
 
 export interface SocialStatistics {

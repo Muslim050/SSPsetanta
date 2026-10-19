@@ -37,12 +37,14 @@ export function spotSummary(report) {
         liveAds: num(spot.liveCount),
         liveSeconds: num(spot.liveSeconds),
         liveViews: num(spot.liveViews),
-        // Лиги Live spot строкой через запятую; сервер пока не хранит.
-        liveLeagues: spot.liveLeagues ?? '',
+        // Лиги Live spot строкой через запятую — у выходов и у секунд свои.
+        liveCountLeagues: spot.liveCountLeague ?? '',
+        liveSecondsLeagues: spot.liveSecondsLeague ?? '',
       }
     }),
     eventPromo: report.eventPromoCount ?? null,
     ottPreroll: report.ottPrerollViews ?? null,
+    ottLive: report.ottLiveViews ?? null,
   }
 }
 
@@ -85,10 +87,16 @@ export function totalSummary(data) {
  * Тело ручного отчёта из цифр вкладки Spot. Счётчики каналов сервер требует
  * числами, промо и прероллы можно оставить пустыми — null.
  */
-export function manualReportInput({ channels, eventPromo, ottPreroll }) {
+export function manualReportInput({
+  channels,
+  eventPromo,
+  ottPreroll,
+  ottLive,
+}) {
   return {
     eventPromoCount: eventPromo ?? null,
     ottPrerollViews: ottPreroll ?? null,
+    ottLiveViews: ottLive ?? null,
     spots: channels.map((channel) => ({
       channel: channel.channel,
       standardCount: num(channel.standardSpots),
@@ -96,7 +104,8 @@ export function manualReportInput({ channels, eventPromo, ottPreroll }) {
       liveCount: num(channel.liveAds),
       liveSeconds: num(channel.liveSeconds),
       liveViews: num(channel.liveViews),
-      liveLeagues: channel.liveLeagues ?? '',
+      liveCountLeague: channel.liveCountLeagues ?? '',
+      liveSecondsLeague: channel.liveSecondsLeagues ?? '',
     })),
   }
 }

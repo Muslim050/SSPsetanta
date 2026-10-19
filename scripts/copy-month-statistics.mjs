@@ -86,6 +86,9 @@ const viewsInput = (stats) => ({
 const manualInput = (report) => ({
   eventPromoCount: report.eventPromoCount ?? null,
   ottPrerollViews: report.ottPrerollViews ?? null,
+  ...(report.ottLiveViews !== undefined
+    ? { ottLiveViews: report.ottLiveViews }
+    : {}),
   spots: (report.spots ?? []).map((spot) => ({
     channel: spot.channel,
     standardCount: spot.standardCount,
@@ -93,7 +96,12 @@ const manualInput = (report) => ({
     liveCount: spot.liveCount,
     liveSeconds: spot.liveSeconds,
     liveViews: spot.liveViews,
-    ...(spot.liveLeagues != null ? { liveLeagues: spot.liveLeagues } : {}),
+    ...(spot.liveCountLeague != null
+      ? { liveCountLeague: spot.liveCountLeague }
+      : {}),
+    ...(spot.liveSecondsLeague != null
+      ? { liveSecondsLeague: spot.liveSecondsLeague }
+      : {}),
   })),
 })
 
