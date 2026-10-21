@@ -29,6 +29,13 @@ export const reportKeys = {
   /** advertiserId — итоги только договоров бренда; null — всех. */
   viewsStats: (period: ReportPeriod, advertiserId: number | null = null) =>
     [...reportKeys.all, 'views-stats', period, advertiserId] as const,
+  /** Итоги за месяцы from…to; advertiserId — как у viewsStats. */
+  viewsStatsRange: (
+    from: ReportPeriod,
+    to: ReportPeriod,
+    advertiserId: number | null = null,
+  ) =>
+    [...reportKeys.all, 'views-stats-range', from, to, advertiserId] as const,
   imports: (contractId: number, period: ReportPeriod) =>
     [...reportKeys.all, 'imports', contractId, period] as const,
   /** Ключ загрузки файла — по нему отчёт видит, что идёт разбор. */
@@ -280,6 +287,10 @@ export function useSaveManualReport() {
       // Из него же итоги «Статистики» за месяц — всех договоров и по брендам.
       client.invalidateQueries({
         queryKey: [...reportKeys.all, 'views-stats', period],
+      })
+      // И итоги за периоды: какой из них задевает месяц, не разбираем.
+      client.invalidateQueries({
+        queryKey: [...reportKeys.all, 'views-stats-range'],
       })
     },
   })
