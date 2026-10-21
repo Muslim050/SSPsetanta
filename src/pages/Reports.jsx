@@ -1,12 +1,14 @@
 import { PageHeader } from '@/components/PageHeader.jsx'
 import { PeriodStatistics } from '@/components/campaigns/PeriodStatistics.jsx'
+import { DEMO_DEVICE, DEMO_GEO } from '@/features/reports/statisticsMock'
 import { usePeriodTotals } from '@/features/reports/usePeriodTotals'
 import { useMonthRange } from '@/lib/useMonthRange.js'
 
 /**
  * «Статистика» рекламодателя: итоги за период «от и до» — `totals`
  * статистики просмотров каждого месяца, сложенные (см. usePeriodTotals).
- * Сервер сам оставляет рекламодателю только его договоры.
+ * Сервер сам оставляет рекламодателю только его договоры. Устройства и
+ * география — пока демо (statisticsMock).
  */
 export default function Reports() {
   const period = useMonthRange()
@@ -20,7 +22,13 @@ export default function Reports() {
       <PageHeader />
       <PeriodStatistics
         period={period}
-        summary={header.summary}
+        summary={
+          header.summary && {
+            ...header.summary,
+            device: DEMO_DEVICE,
+            geo: DEMO_GEO,
+          }
+        }
         loading={header.loading}
         error={header.error}
       />
