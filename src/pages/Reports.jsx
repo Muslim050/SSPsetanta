@@ -6,14 +6,15 @@ import { useMonthRange } from '@/lib/useMonthRange.js'
 
 /**
  * «Статистика» рекламодателя: итоги за период «от и до» — `totals`
- * статистики просмотров каждого месяца, сложенные (см. usePeriodTotals).
+ * статистики просмотров за диапазон месяцев (см. usePeriodTotals).
  * Сервер сам оставляет рекламодателю только его договоры. Устройства и
  * география — пока демо (statisticsMock).
  */
 export default function Reports() {
   const period = useMonthRange()
   const header = usePeriodTotals({
-    periods: period.periods,
+    from: period.from,
+    to: period.to,
     advertiserId: null,
   })
 

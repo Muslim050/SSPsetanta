@@ -808,9 +808,10 @@ export default function Dashboard() {
   // Рекламодатель для итогов в шапке; пусто — все.
   const { data: advertisers = [] } = useAdvertisers()
   const [advertiserId, setAdvertiserId] = useState('')
-  // Итоги за период — с сервера, сложенные по месяцам (см. usePeriodTotals).
+  // Итоги за период — с сервера одним запросом за диапазон (см. usePeriodTotals).
   const header = usePeriodTotals({
-    periods: range.periods,
+    from: range.from,
+    to: range.to,
     advertiserId: advertiserId ? Number(advertiserId) : null,
   })
 
