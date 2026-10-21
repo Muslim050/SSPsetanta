@@ -11,8 +11,8 @@ export const periodOf = (year, month) =>
  * умолчанию — текущий месяц. `onChange` зовётся при любой смене периода:
  * например, чтобы сбросить черновик правки.
  *
- * Возвращает год и период, а ещё `month` — месяц, если период ровно в один
- * (его подсвечивает вкладка), иначе null.
+ * Возвращает год и период, а ещё `month` — месяц, если период ровно в один,
+ * иначе null, и `isCurrent` — период и есть текущий месяц (сбрасывать нечего).
  */
 export function useMonthRange({ onChange } = {}) {
   const now = new Date()
@@ -38,6 +38,7 @@ export function useMonthRange({ onChange } = {}) {
     range,
     month,
     latest,
+    isCurrent: year === currentYear && month === currentMonth,
     from: periodOf(year, range.from),
     to: periodOf(year, range.to),
     // Все месяцы периода по порядку, 'YYYY-MM'.
@@ -49,8 +50,8 @@ export function useMonthRange({ onChange } = {}) {
       month != null
         ? `${MONTHS_FULL[month].toLowerCase()} ${year}`
         : `${MONTHS_FULL[range.from].toLowerCase()} — ${MONTHS_FULL[range.to].toLowerCase()} ${year}`,
-    // Вкладка ставит период на свой месяц. Сброс (крестик или повторный
-    // клик) возвращает к текущему: без периода смотреть нечего.
+    // Ставит период на один месяц. Сброс (null, крестик) возвращает к
+    // текущему: без периода смотреть нечего.
     pickMonth: (next) =>
       next == null
         ? change(currentYear, { from: currentMonth, to: currentMonth })
