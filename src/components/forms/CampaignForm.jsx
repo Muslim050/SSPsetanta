@@ -9,7 +9,14 @@ import { useAuth } from '@/features/auth/useAuth'
 import { useToast } from '@/components/ui/Toast.jsx'
 import { Modal } from '@/components/ui/Modal.jsx'
 import { Button } from '@/components/ui/Button'
-import { Field, Input, Select } from '@/components/ui/Field'
+import { Field, Input } from '@/components/ui/Field'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { FilePicker } from '@/components/ui/FilePicker.jsx'
 import { absoluteUrl } from '@/api/endpoints/files'
 import { Logo } from '@/components/Logo'
@@ -279,17 +286,21 @@ export function CampaignForm({ open, onClose, initial, defaultAdvertiserId }) {
         {pickBrand && (
           <Field label="Рекламодатель" required error={errors.advertiserId}>
             <Select
-              value={form.advertiserId ?? ''}
-              onChange={(e) => pickAdvertiser(Number(e.target.value) || null)}
+              value={form.advertiserId ? String(form.advertiserId) : ''}
+              onValueChange={(value) => pickAdvertiser(Number(value) || null)}
             >
-              <option value="">— выберите рекламодателя —</option>
-              {[...advertisers]
-                .sort((a, b) => a.name.localeCompare(b.name, 'ru'))
-                .map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
+              <SelectTrigger aria-invalid={!!errors.advertiserId}>
+                <SelectValue placeholder="Выберите рекламодателя" />
+              </SelectTrigger>
+              <SelectContent>
+                {[...advertisers]
+                  .sort((a, b) => a.name.localeCompare(b.name, 'ru'))
+                  .map((item) => (
+                    <SelectItem key={item.id} value={String(item.id)}>
+                      {item.name}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
             </Select>
           </Field>
         )}
@@ -334,14 +345,18 @@ export function CampaignForm({ open, onClose, initial, defaultAdvertiserId }) {
             {contracts.length ? (
               <Select
                 value={form.contractNumber}
-                onChange={(e) => set('contractNumber', e.target.value)}
+                onValueChange={(value) => set('contractNumber', value)}
               >
-                <option value="">— выберите договор —</option>
-                {contracts.map((contract) => (
-                  <option key={contract.id} value={contract.number}>
-                    {contract.number}
-                  </option>
-                ))}
+                <SelectTrigger aria-invalid={!!errors.contractNumber}>
+                  <SelectValue placeholder="Выберите договор" />
+                </SelectTrigger>
+                <SelectContent>
+                  {contracts.map((contract) => (
+                    <SelectItem key={contract.id} value={contract.number}>
+                      {contract.number}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             ) : (
               <Input
@@ -490,20 +505,25 @@ export function CampaignForm({ open, onClose, initial, defaultAdvertiserId }) {
             <Field label="Статус">
               <Select
                 value={form.status}
-                onChange={(e) => set('status', e.target.value)}
+                onValueChange={(value) => set('status', value)}
               >
-                {Object.entries(STATUS)
-                  // Скрытый статус оставляем, если он уже стоит у кампании:
-                  // иначе select показал бы первый вариант и сохранение молча
-                  // сменило бы статус заявки.
-                  .filter(
-                    ([k]) => !HIDDEN_STATUS.includes(k) || k === form.status,
-                  )
-                  .map(([k, v]) => (
-                    <option key={k} value={k}>
-                      {v.label}
-                    </option>
-                  ))}
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(STATUS)
+                    // Скрытый статус оставляем, если он уже стоит у кампании:
+                    // иначе список показал бы пустое поле, а выбор другого
+                    // статуса молча сменил бы статус заявки.
+                    .filter(
+                      ([k]) => !HIDDEN_STATUS.includes(k) || k === form.status,
+                    )
+                    .map(([k, v]) => (
+                      <SelectItem key={k} value={k}>
+                        {v.label}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
               </Select>
             </Field>
           )}
