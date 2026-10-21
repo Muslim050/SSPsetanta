@@ -588,6 +588,17 @@ export interface ViewsStatistics {
   totals?: StatisticsTotals
 }
 
+/**
+ * Итоги статистики просмотров за месяцы `periodFrom`…`periodTo` включительно
+ * (`/reports/views-statistics`) — те же `totals`, что за месяц, сложенные
+ * сервером. Доли за диапазон не сводятся. Отчётов нет — нули.
+ */
+export interface ViewsStatisticsRange {
+  periodFrom: ReportPeriod
+  periodTo: ReportPeriod
+  totals: StatisticsTotals
+}
+
 /** Сохранение статистики просмотров: все группы обязательны, запись целиком. */
 export interface ViewsStatisticsInput {
   age: AgeShares

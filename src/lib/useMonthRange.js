@@ -41,10 +41,6 @@ export function useMonthRange({ onChange } = {}) {
     isCurrent: year === currentYear && month === currentMonth,
     from: periodOf(year, range.from),
     to: periodOf(year, range.to),
-    // Все месяцы периода по порядку, 'YYYY-MM'.
-    periods: Array.from({ length: range.to - range.from + 1 }, (_, index) =>
-      periodOf(year, range.from + index),
-    ),
     // «март 2026» или «март — октябрь 2026».
     label:
       month != null

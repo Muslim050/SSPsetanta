@@ -13,6 +13,7 @@ import type {
   TotalStatistics,
   ViewsStatistics,
   ViewsStatisticsInput,
+  ViewsStatisticsRange,
 } from '../types'
 
 /**
@@ -93,6 +94,22 @@ export function viewsStatistics(
 ): Promise<ViewsStatistics> {
   return request<ViewsStatistics>(
     `/reports/${period}/views-statistics${buildQuery({ advertiserId })}`,
+  )
+}
+
+/**
+ * GET /reports/views-statistics — итоги статистики просмотров за месяцы
+ * `periodFrom`…`periodTo` включительно, сложенные сервером. Доли не отдаёт —
+ * только `totals`. `advertiserId` — только договоры бренда; рекламодателю
+ * сервер всегда оставляет его договоры.
+ */
+export function viewsStatisticsRange(
+  periodFrom: ReportPeriod,
+  periodTo: ReportPeriod,
+  advertiserId?: number | null,
+): Promise<ViewsStatisticsRange> {
+  return request<ViewsStatisticsRange>(
+    `/reports/views-statistics${buildQuery({ periodFrom, periodTo, advertiserId })}`,
   )
 }
 
