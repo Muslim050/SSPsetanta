@@ -810,10 +810,7 @@ export default function Dashboard() {
   const [advertiserId, setAdvertiserId] = useState('')
   // Итоги за период — с сервера, сложенные по месяцам (см. usePeriodTotals).
   const header = usePeriodTotals({
-    periods: Array.from(
-      { length: range.range.to - range.range.from + 1 },
-      (_, index) => periodOf(range.year, range.range.from + index),
-    ),
+    periods: range.periods,
     advertiserId: advertiserId ? Number(advertiserId) : null,
   })
 

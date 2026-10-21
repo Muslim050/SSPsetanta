@@ -7,7 +7,7 @@ export const periodOf = (year, month) =>
 
 /**
  * Период «от и до» по месяцам внутри года — для страниц «Статистика».
- * Год выбирают во вкладках, начало и окончание — месяцы этого года; по
+ * Год выбирают стрелками, начало и окончание — месяцы этого года; по
  * умолчанию — текущий месяц. `onChange` зовётся при любой смене периода:
  * например, чтобы сбросить черновик правки.
  *
@@ -40,6 +40,10 @@ export function useMonthRange({ onChange } = {}) {
     latest,
     from: periodOf(year, range.from),
     to: periodOf(year, range.to),
+    // Все месяцы периода по порядку, 'YYYY-MM'.
+    periods: Array.from({ length: range.to - range.from + 1 }, (_, index) =>
+      periodOf(year, range.from + index),
+    ),
     // «март 2026» или «март — октябрь 2026».
     label:
       month != null

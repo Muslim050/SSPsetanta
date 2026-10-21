@@ -64,6 +64,47 @@ const arrowClass =
   'flex h-7 w-7 items-center justify-center rounded-lg text-ink-muted transition-colors focus-ring enabled:hover:bg-ink/6 enabled:hover:text-ink-soft disabled:opacity-35'
 
 /**
+ * Выбор года стрелками среди `years` — слева во вкладках месяцев и рядом с
+ * периодом на страницах «Статистика».
+ */
+export function YearSwitcher({ year, years, onChange, className }) {
+  const index = years.indexOf(year)
+  const prev = index > 0 ? years[index - 1] : null
+  const next = index >= 0 && index < years.length - 1 ? years[index + 1] : null
+
+  return (
+    <div
+      className={cn(
+        'inline-flex shrink-0 items-center gap-1 rounded-xl border border-line bg-surface p-[4.5px]',
+        className,
+      )}
+    >
+      <button
+        type="button"
+        disabled={prev == null}
+        onClick={() => onChange(prev)}
+        aria-label="Предыдущий год"
+        className={arrowClass}
+      >
+        <ChevronLeft size={16} />
+      </button>
+      <span className="min-w-[46px] text-center text-[13px] font-semibold text-ink tnum">
+        {year}
+      </span>
+      <button
+        type="button"
+        disabled={next == null}
+        onClick={() => onChange(next)}
+        aria-label="Следующий год"
+        className={arrowClass}
+      >
+        <ChevronRight size={16} />
+      </button>
+    </div>
+  )
+}
+
+/**
  * Фильтр периода: слева выбор года стрелками, справа 12 месяцев.
  * Отдельной вкладки «Все» нет: фильтр снимает крестик справа (или повторный
  * клик по выбранному месяцу).
@@ -86,10 +127,6 @@ export function MonthTabs({
   resetLabel = 'Показать все месяцы',
   className,
 }) {
-  const index = years.indexOf(year)
-  const prev = index > 0 ? years[index - 1] : null
-  const next = index >= 0 && index < years.length - 1 ? years[index + 1] : null
-
   const now = new Date()
   const currentYear = now.getFullYear()
   const currentMonth = now.getMonth()
@@ -98,29 +135,7 @@ export function MonthTabs({
 
   return (
     <div className={cn('flex  items-center gap-2', className)}>
-      <div className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-line bg-surface p-[4.5px]">
-        <button
-          type="button"
-          disabled={prev == null}
-          onClick={() => onYearChange(prev)}
-          aria-label="Предыдущий год"
-          className={arrowClass}
-        >
-          <ChevronLeft size={16} />
-        </button>
-        <span className="min-w-[46px] text-center text-[13px] font-semibold text-ink tnum">
-          {year}
-        </span>
-        <button
-          type="button"
-          disabled={next == null}
-          onClick={() => onYearChange(next)}
-          aria-label="Следующий год"
-          className={arrowClass}
-        >
-          <ChevronRight size={16} />
-        </button>
-      </div>
+      <YearSwitcher year={year} years={years} onChange={onYearChange} />
 
       <div
         role="tablist"
