@@ -1,21 +1,28 @@
 import { PageHeader } from '@/components/PageHeader.jsx'
 import { PeriodStatistics } from '@/components/campaigns/PeriodStatistics.jsx'
-import { mockRangeSummary } from '@/features/reports/statisticsMock'
+import { usePeriodTotals } from '@/features/reports/usePeriodTotals'
 import { useMonthRange } from '@/lib/useMonthRange.js'
 
 /**
- * «Статистика» рекламодателя: итоги за период «от и до» по месяцам — пока
- * на моках (statisticsMock), вместе с соцсетями, устройствами и городами.
+ * «Статистика» рекламодателя: итоги за период «от и до» — `totals`
+ * статистики просмотров каждого месяца, сложенные (см. usePeriodTotals).
+ * Сервер сам оставляет рекламодателю только его договоры.
  */
 export default function Reports() {
   const period = useMonthRange()
+  const header = usePeriodTotals({
+    periods: period.periods,
+    advertiserId: null,
+  })
 
   return (
     <div>
       <PageHeader />
       <PeriodStatistics
         period={period}
-        summary={mockRangeSummary(period.from, period.to)}
+        summary={header.summary}
+        loading={header.loading}
+        error={header.error}
       />
     </div>
   )
