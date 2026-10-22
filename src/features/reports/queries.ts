@@ -14,6 +14,7 @@ import type {
   TotalStatistics,
   ViewsStatistics,
   ViewsStatisticsInput,
+  ViewsStatisticsRange,
 } from '@/api/types'
 
 export const reportKeys = {
@@ -29,7 +30,7 @@ export const reportKeys = {
   /** advertiserId — итоги только договоров бренда; null — всех. */
   viewsStats: (period: ReportPeriod, advertiserId: number | null = null) =>
     [...reportKeys.all, 'views-stats', period, advertiserId] as const,
-  /** Итоги за месяцы from…to; advertiserId — как у viewsStats. */
+  /** Итоги за несколько месяцев from…to; advertiserId — как у viewsStats. */
   viewsStatsRange: (
     from: ReportPeriod,
     to: ReportPeriod,
@@ -124,21 +125,36 @@ export function useTotalStatistics(
   })
 }
 
-/** Статистика просмотров за месяц — одна на все договоры. */
-export function useViewsStatistics(period: ReportPeriod | null | undefined) {
+/**
+ * Статистика просмотров за месяцы from…to — всегда один запрос. Месяц один —
+ * статистика месяца (`/reports/:period/views-statistics`): доли (одни на все
+ * договоры) и итоги. Несколько — диапазон (`/reports/views-statistics`):
+ * только итоги, сложенные сервером. advertiserId — итоги только договоров
+ * бренда; null — всех.
+ */
+export function useViewsStatisticsPeriod(
+  from: ReportPeriod,
+  to: ReportPeriod,
+  advertiserId: number | null = null,
+) {
+  const single = from === to
   return useQuery({
-    queryKey: reportKeys.viewsStats(period ?? ''),
-    queryFn: (): Promise<ViewsStatistics> =>
-      reportsApi.viewsStatistics(period as ReportPeriod),
-    enabled: !!period,
+    queryKey: single
+      ? reportKeys.viewsStats(from, advertiserId)
+      : reportKeys.viewsStatsRange(from, to, advertiserId),
+    queryFn: (): Promise<ViewsStatistics | ViewsStatisticsRange> =>
+      single
+        ? reportsApi.viewsStatistics(from, advertiserId)
+        : reportsApi.viewsStatisticsRange(from, to, advertiserId),
     retry: retryServerErrors,
   })
 }
 
 /**
- * Сохранение статистики просмотров за месяц. Ответ кладём в кэш сразу;
- * итоги Total всех договоров перечитываем — устройства и города в них
- * берутся отсюда.
+ * Сохранение статистики просмотров за месяц. Доли из ответа кладём сразу в
+ * статистику этого месяца по всем брендам — итоги в ней свои, их не
+ * трогаем; итоги Total всех договоров перечитываем — устройства и города в
+ * них берутся отсюда.
  */
 export function useSaveViewsStatistics() {
   const client = useQueryClient()
@@ -152,7 +168,10 @@ export function useSaveViewsStatistics() {
       input: ViewsStatisticsInput
     }) => reportsApi.saveViewsStatistics(period, input),
     onSuccess: (stats, { period }) => {
-      client.setQueryData(reportKeys.viewsStats(period), stats)
+      client.setQueriesData<ViewsStatistics>(
+        { queryKey: [...reportKeys.all, 'views-stats', period] },
+        (old) => old && { ...old, ...stats, totals: old.totals },
+      )
       client.invalidateQueries({ queryKey: [...reportKeys.all, 'total-stats'] })
     },
   })
