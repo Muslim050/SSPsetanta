@@ -113,6 +113,8 @@ export function YearSwitcher({ year, years, onChange, className }) {
  * statusTitles: подписи этих статусов в подсказке вкладки.
  * statusFills: свой цвет вкладки для статуса — поверх STATUS_FILLS.
  * resetLabel: что делает крестик — страницы трактуют сброс по-разному.
+ * until: последний месяц `{ year, month }` (month — с нуля), например
+ * окончание договора: месяцы после него не показываем. null — все 12.
  */
 export function MonthTabs({
   year,
@@ -125,6 +127,7 @@ export function MonthTabs({
   statusTitles = { paid: 'оплачен', awaiting: 'ожидает оплату' },
   statusFills,
   resetLabel = 'Показать все месяцы',
+  until = null,
   className,
 }) {
   const now = new Date()
@@ -143,6 +146,12 @@ export function MonthTabs({
         className="no-scrollbar inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-xl border border-line bg-surface p-[4.5px]"
       >
         {MONTHS_SHORT.map((label, month) => {
+          if (
+            until &&
+            (year > until.year || (year === until.year && month > until.month))
+          ) {
+            return null
+          }
           const active = value === month
           const count = counts?.[month] ?? 0
           const status = statuses?.[month] ?? null

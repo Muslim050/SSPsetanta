@@ -137,6 +137,20 @@ function isCurrentMonth(year, month) {
   return year === now.getFullYear() && month === now.getMonth()
 }
 
+/** Месяц окончания договора `{ year, month }` (month — с нуля); нет даты — null. */
+function contractEndMonth(contract) {
+  if (!contract?.end) return null
+  return {
+    year: Number(contract.end.slice(0, 4)),
+    month: Number(contract.end.slice(5, 7)) - 1,
+  }
+}
+
+/** Месяц позже окончания договора? Без окончания — нет. */
+function isAfterEnd(end, year, month) {
+  return !!end && (year > end.year || (year === end.year && month > end.month))
+}
+
 /** Годы, которые задевают кампании, плюс текущий — по ним листаем месяцы. */
 function yearsOf(campaigns, currentYear) {
   const years = new Set([currentYear])
@@ -156,6 +170,14 @@ function contractsOf(advertiser, campaigns) {
   return (advertiser?.contracts ?? []).map((contract) => ({
     value: contract.number,
     label: contract.number,
+    // Подсказка — номер и срок договора; статус оплаты и так виден цветом.
+    tooltip: [
+      `Договор ${contract.number}`,
+      (contract.start || contract.end) &&
+        `С ${formatDateNumeric(contract.start)} до ${formatDateNumeric(contract.end)}`,
+    ]
+      .filter(Boolean)
+      .join('\n'),
     count: campaigns.filter((c) => c.contractNumber === contract.number).length,
     // Статус оплаты нужен вкладке: по нему она красится ещё до выбора.
     paymentStatus: contract.paymentStatus,
@@ -304,8 +326,23 @@ export default function Campaigns() {
   // задаёт, за какой год показаны 12 месяцев, фильтр включается с выбором
   // месяца. Без договора выбранный месяц не действует.
   const showMonths = activeContract !== ALL_CONTRACTS
+
+  // Договор, открытый сейчас: по нему ведутся суммы и выплаты.
+  const selectedContract =
+    activeContract === ALL_CONTRACTS
+      ? null
+      : ((contractBrand?.contracts ?? []).find(
+          (c) => c.number === activeContract,
+        ) ?? null)
+  // Месяцы после окончания договора не показываем — и годы после него тоже.
+  const contractEnd = contractEndMonth(selectedContract)
+
   const currentYear = new Date().getFullYear()
-  const years = yearsOf(contractCampaigns, currentYear)
+  const allYears = yearsOf(contractCampaigns, currentYear)
+  const endedYears = contractEnd
+    ? allYears.filter((y) => y <= contractEnd.year)
+    : allYears
+  const years = endedYears.length ? endedYears : [contractEnd.year]
   // Год мог пропасть вместе со сменой бренда или договора.
   const activeYear = years.includes(year)
     ? year
@@ -320,7 +357,10 @@ export default function Campaigns() {
       : 0,
   )
   const activeMonth =
-    showMonths && month != null && isPassedMonth(activeYear, month)
+    showMonths &&
+    month != null &&
+    isPassedMonth(activeYear, month) &&
+    !isAfterEnd(contractEnd, activeYear, month)
       ? month
       : null
   // Внутри выбранного месяца переключаемся между отчётом и списком кампаний.
@@ -333,13 +373,6 @@ export default function Campaigns() {
   const monthView = monthTab ?? defaultMonthView
   const showMonthReport = monthOpened && monthView === 'stats'
 
-  // Договор, открытый сейчас: по нему ведутся суммы и выплаты.
-  const selectedContract =
-    activeContract === ALL_CONTRACTS
-      ? null
-      : ((contractBrand?.contracts ?? []).find(
-          (c) => c.number === activeContract,
-        ) ?? null)
   const contractBudget = toNumber(selectedContract?.budget)
   const contractPacing = contractBudget
     ? (toNumber(selectedContract?.spent) / contractBudget) * 100
@@ -871,6 +904,7 @@ export default function Campaigns() {
             }
             counts={monthCounts}
             statuses={monthStatuses}
+            until={contractEnd}
           />
         </div>
       )}
