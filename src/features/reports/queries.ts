@@ -12,7 +12,6 @@ import type {
   ReportSheetCode,
   ReportSheetInput,
   TotalStatistics,
-  ViewsStatistics,
   ViewsStatisticsInput,
   ViewsStatisticsRange,
 } from '@/api/types'
@@ -27,10 +26,10 @@ export const reportKeys = {
     [...reportKeys.all, 'manual', contractId, period] as const,
   totalStats: (contractId: number, period: ReportPeriod) =>
     [...reportKeys.all, 'total-stats', contractId, period] as const,
-  /** advertiserId — итоги только договоров бренда; null — всех. */
-  viewsStats: (period: ReportPeriod, advertiserId: number | null = null) =>
-    [...reportKeys.all, 'views-stats', period, advertiserId] as const,
-  /** Итоги за несколько месяцев from…to; advertiserId — как у viewsStats. */
+  /**
+   * Статистика просмотров за месяцы from…to. advertiserId — итоги только
+   * договоров бренда; null — всех.
+   */
   viewsStatsRange: (
     from: ReportPeriod,
     to: ReportPeriod,
@@ -126,35 +125,30 @@ export function useTotalStatistics(
 }
 
 /**
- * Статистика просмотров за месяцы from…to — всегда один запрос. Месяц один —
- * статистика месяца (`/reports/:period/views-statistics`): доли (одни на все
- * договоры) и итоги. Несколько — диапазон (`/reports/views-statistics`):
- * только итоги, сложенные сервером. advertiserId — итоги только договоров
- * бренда; null — всех.
+ * Статистика просмотров за месяцы from…to — всегда диапазоном
+ * (`/reports/views-statistics`), даже за один месяц. Месяц один — вся
+ * статистика месяца: доли (одни на все договоры) и итоги; несколько — только
+ * итоги, сложенные сервером. advertiserId — итоги только договоров бренда;
+ * null — всех.
  */
 export function useViewsStatisticsPeriod(
   from: ReportPeriod,
   to: ReportPeriod,
   advertiserId: number | null = null,
 ) {
-  const single = from === to
   return useQuery({
-    queryKey: single
-      ? reportKeys.viewsStats(from, advertiserId)
-      : reportKeys.viewsStatsRange(from, to, advertiserId),
-    queryFn: (): Promise<ViewsStatistics | ViewsStatisticsRange> =>
-      single
-        ? reportsApi.viewsStatistics(from, advertiserId)
-        : reportsApi.viewsStatisticsRange(from, to, advertiserId),
+    queryKey: reportKeys.viewsStatsRange(from, to, advertiserId),
+    queryFn: (): Promise<ViewsStatisticsRange> =>
+      reportsApi.viewsStatisticsRange(from, to, advertiserId),
     retry: retryServerErrors,
   })
 }
 
 /**
  * Сохранение статистики просмотров за месяц. Доли из ответа кладём сразу в
- * статистику этого месяца по всем брендам — итоги в ней свои, их не
- * трогаем; итоги Total всех договоров перечитываем — устройства и города в
- * них берутся отсюда.
+ * статистику этого месяца (диапазон из одного месяца) по всем брендам —
+ * итоги в ней свои, их не трогаем; итоги Total всех договоров перечитываем —
+ * устройства и города в них берутся отсюда.
  */
 export function useSaveViewsStatistics() {
   const client = useQueryClient()
@@ -168,8 +162,8 @@ export function useSaveViewsStatistics() {
       input: ViewsStatisticsInput
     }) => reportsApi.saveViewsStatistics(period, input),
     onSuccess: (stats, { period }) => {
-      client.setQueriesData<ViewsStatistics>(
-        { queryKey: [...reportKeys.all, 'views-stats', period] },
+      client.setQueriesData<ViewsStatisticsRange>(
+        { queryKey: [...reportKeys.all, 'views-stats-range', period, period] },
         (old) => old && { ...old, ...stats, totals: old.totals },
       )
       client.invalidateQueries({ queryKey: [...reportKeys.all, 'total-stats'] })
@@ -303,11 +297,8 @@ export function useSaveManualReport() {
       client.invalidateQueries({
         queryKey: reportKeys.totalStats(contractId, period),
       })
-      // Из него же итоги «Статистики» за месяц — всех договоров и по брендам.
-      client.invalidateQueries({
-        queryKey: [...reportKeys.all, 'views-stats', period],
-      })
-      // И итоги за периоды: какой из них задевает месяц, не разбираем.
+      // Из него же итоги «Статистики» — всех договоров и по брендам. Какой
+      // период задевает месяц, не разбираем: перечитываем все.
       client.invalidateQueries({
         queryKey: [...reportKeys.all, 'views-stats-range'],
       })

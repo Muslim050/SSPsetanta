@@ -83,25 +83,13 @@ export function totalStatistics(
 }
 
 /**
- * GET /reports/:period/views-statistics — статистика просмотров за месяц:
- * доли по возрасту, устройствам (общие, OTT, TV), возрасту по лигам и
- * городам. Одна на все договоры. Всегда 200; не ввели — группы null.
- * `advertiserId` оставляет в `totals` только договоры бренда, доли не меняет.
- */
-export function viewsStatistics(
-  period: ReportPeriod,
-  advertiserId?: number | null,
-): Promise<ViewsStatistics> {
-  return request<ViewsStatistics>(
-    `/reports/${period}/views-statistics${buildQuery({ advertiserId })}`,
-  )
-}
-
-/**
- * GET /reports/views-statistics — итоги статистики просмотров за месяцы
- * `periodFrom`…`periodTo` включительно, сложенные сервером. Доли не отдаёт —
- * только `totals`. `advertiserId` — только договоры бренда; рекламодателю
- * сервер всегда оставляет его договоры.
+ * GET /reports/views-statistics — статистика просмотров за месяцы
+ * `periodFrom`…`periodTo` включительно. Месяц один — вся статистика месяца:
+ * доли по возрасту, устройствам (общие, OTT, TV), возрасту по лигам и городам
+ * (одни на все договоры; не ввели — группы null) и `totals`. Несколько —
+ * только `totals`, сложенные сервером. `advertiserId` оставляет в `totals`
+ * только договоры бренда, доли не меняет; рекламодателю сервер всегда
+ * оставляет его договоры.
  */
 export function viewsStatisticsRange(
   periodFrom: ReportPeriod,
