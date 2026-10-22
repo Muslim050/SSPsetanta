@@ -32,10 +32,12 @@ const STATUS_ACTIVE = {
 
 /**
  * Сегментированный переключатель.
- * items: [{ value, label, count?, status?, statusHint? }], value, onChange,
- * tone: accent | soft. `status` (paid | awaiting) красит вкладку в цвет
- * статуса, `statusHint` объясняет её состояние словами — цвет один смысл
+ * items: [{ value, label, count?, status?, statusHint?, tooltip? }], value,
+ * onChange, tone: accent | soft. `status` (paid | awaiting) красит вкладку в
+ * цвет статуса, `statusHint` объясняет её состояние словами — цвет один смысл
  * нести не может, и он же остаётся подсказкой у вкладок без заливки.
+ * `tooltip` — своя подсказка вместо «подпись — статус»; скринридер статус
+ * всё равно прочтёт.
  */
 export function SegmentTabs({
   items,
@@ -71,7 +73,10 @@ export function SegmentTabs({
             onClick={() => onChange(it.value)}
             // Подсказка и подпись для скринридера: по одному цвету статус
             // не прочитать.
-            title={it.statusHint ? `${it.label} — ${it.statusHint}` : undefined}
+            title={
+              it.tooltip ??
+              (it.statusHint ? `${it.label} — ${it.statusHint}` : undefined)
+            }
             aria-label={
               it.statusHint ? `${it.label}, ${it.statusHint}` : undefined
             }
