@@ -1,28 +1,35 @@
-import { useQuery } from '@tanstack/react-query'
-import * as reportsApi from '@/api/endpoints/reports'
-import { reportKeys } from '@/features/reports/queries'
+import { useViewsStatisticsPeriod } from '@/features/reports/queries'
 
 /**
- * Четыре блока «Статистики» за месяцы `from`…`to` — `totals` статистики
- * просмотров за диапазон (`GET /reports/views-statistics`): сервер сам
- * складывает ручные отчёты договоров по всем месяцам. `advertiserId` — только
- * договоры этого рекламодателя, null — все; рекламодателю сервер и так
- * оставляет только его договоры.
+ * «Статистика» за месяцы `from`…`to` — одним запросом (см.
+ * useViewsStatisticsPeriod): месяц один — статистика месяца, несколько —
+ * итоги за диапазон, их сервер сам складывает по месяцам. `advertiserId` —
+ * только договоры этого рекламодателя, null — все; рекламодателю сервер и
+ * так оставляет только его договоры.
  *
- * Возвращает summary в форме totalSummary (без соцсетей, устройств и городов —
- * они ниже на странице свои) или null, пока грузится или не загрузилось.
+ * Возвращает summary в форме totalSummary (без соцсетей) или null, пока
+ * грузится или не загрузилось. Устройства и города в нём есть, только когда
+ * месяц один: доли разных месяцев сервер не складывает. `stats` — ответ
+ * целиком: за один месяц в нём и остальные доли (возраст, OTT и TV, лиги).
  */
 export function usePeriodTotals({ from, to, advertiserId }) {
-  const query = useQuery({
-    queryKey: reportKeys.viewsStatsRange(from, to, advertiserId),
-    queryFn: () => reportsApi.viewsStatisticsRange(from, to, advertiserId),
-  })
+  const query = useViewsStatisticsPeriod(from, to, advertiserId)
+  const stats = query.data
 
   return {
     loading: query.isPending,
     error: query.isError,
-    summary: query.data
-      ? { totals: query.data.totals, social: {}, device: null, geo: [] }
+    stats,
+    summary: stats
+      ? {
+          totals: stats.totals,
+          social: {},
+          device: stats.device ?? null,
+          geo: (stats.geo ?? []).map((row) => ({
+            name: row.city,
+            value: Number(row.value) || 0,
+          })),
+        }
       : null,
   }
 }

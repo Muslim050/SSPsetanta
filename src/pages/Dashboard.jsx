@@ -19,10 +19,7 @@ import {
 import { useAuth } from '@/features/auth/useAuth'
 import { useData } from '@/context/DataContext.jsx'
 import { useAdvertisers } from '@/features/advertisers/queries'
-import {
-  useSaveViewsStatistics,
-  useViewsStatistics,
-} from '@/features/reports/queries'
+import { useSaveViewsStatistics } from '@/features/reports/queries'
 import { usePeriodTotals } from '@/features/reports/usePeriodTotals'
 import {
   AGE_KEYS,
@@ -808,22 +805,23 @@ export default function Dashboard() {
   // Рекламодатель для итогов в шапке; пусто — все.
   const { data: advertisers = [] } = useAdvertisers()
   const [advertiserId, setAdvertiserId] = useState('')
-  // Итоги за период — с сервера одним запросом за диапазон (см. usePeriodTotals).
+  // Статистика за период — с сервера одним запросом (см. usePeriodTotals):
+  // итоги в шапке и, когда месяц один, разделы аудитории.
   const header = usePeriodTotals({
     from: range.from,
     to: range.to,
     advertiserId: advertiserId ? Number(advertiserId) : null,
   })
 
-  // Разделы аудитории — статистика просмотров месяца с сервера (одна на все
-  // договоры). YouTube пока живёт демо-данными в браузере.
-  const views = useViewsStatistics(period)
+  // Разделы аудитории — доли месяца из того же ответа (одни на все договоры,
+  // от выбора рекламодателя не зависят). YouTube пока живёт демо-данными в
+  // браузере.
   const { mutate: saveViews, isPending: savingViews } = useSaveViewsStatistics()
   const audience = useMemo(
-    () => (views.data ? audienceFromServer(views.data) : null),
-    [views.data],
+    () => (period && header.stats ? audienceFromServer(header.stats) : null),
+    [period, header.stats],
   )
-  const viewsLoading = views.isPending && views.fetchStatus !== 'idle'
+  const viewsLoading = header.loading
   const canEditPage = canEdit && !isAdvertiser
   const emptyText = canEditPage
     ? 'Не введено — нажмите «Редактировать»'
@@ -944,7 +942,9 @@ export default function Dashboard() {
 
       <PeriodStatistics
         period={range}
-        summary={header.summary}
+        // Устройства и города — в разделах аудитории ниже, в шапке не
+        // повторяем.
+        summary={header.summary && { ...header.summary, device: null, geo: [] }}
         loading={header.loading}
         error={header.error}
         filter={
@@ -977,7 +977,7 @@ export default function Dashboard() {
               label={`Загружаем статистику за ${monthLabel}…`}
               className="min-h-0 py-8 sm:min-h-0"
             />
-          ) : views.isError ? (
+          ) : header.error ? (
             <NotEntered
               text="Не удалось загрузить статистику просмотров — обновите страницу."
               className="mt-6"
