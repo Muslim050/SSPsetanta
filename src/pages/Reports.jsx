@@ -5,10 +5,11 @@ import { usePeriodTotals } from '@/features/reports/usePeriodTotals'
 import { useMonthRange } from '@/lib/useMonthRange.js'
 
 /**
- * «Статистика» рекламодателя: итоги за период «от и до» — `totals`
- * статистики просмотров за диапазон месяцев (см. usePeriodTotals).
- * Сервер сам оставляет рекламодателю только его договоры. Устройства и
- * география — пока демо (statisticsMock).
+ * «Статистика» рекламодателя: итоги за период «от и до» — статистика
+ * просмотров одним запросом (см. usePeriodTotals). Сервер сам оставляет
+ * рекламодателю только его договоры. Устройства и география за один месяц —
+ * с сервера; за несколько сервер их не складывает, там — демо
+ * (statisticsMock).
  */
 export default function Reports() {
   const period = useMonthRange()
@@ -24,11 +25,10 @@ export default function Reports() {
       <PeriodStatistics
         period={period}
         summary={
-          header.summary && {
-            ...header.summary,
-            device: DEMO_DEVICE,
-            geo: DEMO_GEO,
-          }
+          header.summary &&
+          (period.month != null
+            ? header.summary
+            : { ...header.summary, device: DEMO_DEVICE, geo: DEMO_GEO })
         }
         loading={header.loading}
         error={header.error}
