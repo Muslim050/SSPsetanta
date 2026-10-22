@@ -589,11 +589,12 @@ export interface ViewsStatistics {
 }
 
 /**
- * Итоги статистики просмотров за месяцы `periodFrom`…`periodTo` включительно
- * (`/reports/views-statistics`) — те же `totals`, что за месяц, сложенные
- * сервером. Доли за диапазон не сводятся. Отчётов нет — нули.
+ * Статистика просмотров за месяцы `periodFrom`…`periodTo` включительно
+ * (`/reports/views-statistics`). Месяц один — вся статистика месяца, как у
+ * ViewsStatistics. Несколько — только `totals`, сложенные сервером: доли
+ * разных месяцев не складываются, их в ответе нет. Отчётов нет — нули.
  */
-export interface ViewsStatisticsRange {
+export type ViewsStatisticsRange = Partial<ViewsStatistics> & {
   periodFrom: ReportPeriod
   periodTo: ReportPeriod
   totals: StatisticsTotals
