@@ -137,18 +137,19 @@ function isCurrentMonth(year, month) {
   return year === now.getFullYear() && month === now.getMonth()
 }
 
-/** Месяц окончания договора `{ year, month }` (month — с нуля); нет даты — null. */
-function contractEndMonth(contract) {
-  if (!contract?.end) return null
-  return {
-    year: Number(contract.end.slice(0, 4)),
-    month: Number(contract.end.slice(5, 7)) - 1,
-  }
+/** Месяц даты `{ year, month }` (month — с нуля); нет даты — null. */
+function monthOfDate(date) {
+  if (!date) return null
+  return { year: Number(date.slice(0, 4)), month: Number(date.slice(5, 7)) - 1 }
 }
 
-/** Месяц позже окончания договора? Без окончания — нет. */
-function isAfterEnd(end, year, month) {
-  return !!end && (year > end.year || (year === end.year && month > end.month))
+/** Месяц вне срока договора — до начала или после окончания? */
+function isOutsideTerm(start, end, year, month) {
+  const at = year * 12 + month
+  return (
+    (!!start && at < start.year * 12 + start.month) ||
+    (!!end && at > end.year * 12 + end.month)
+  )
 }
 
 /** Годы, которые задевают кампании, плюс текущий — по ним листаем месяцы. */
@@ -334,15 +335,20 @@ export default function Campaigns() {
       : ((contractBrand?.contracts ?? []).find(
           (c) => c.number === activeContract,
         ) ?? null)
-  // Месяцы после окончания договора не показываем — и годы после него тоже.
-  const contractEnd = contractEndMonth(selectedContract)
+  // Показываем только месяцы срока договора — и годы только его.
+  const contractStart = monthOfDate(selectedContract?.start)
+  const contractEnd = monthOfDate(selectedContract?.end)
 
   const currentYear = new Date().getFullYear()
   const allYears = yearsOf(contractCampaigns, currentYear)
-  const endedYears = contractEnd
-    ? allYears.filter((y) => y <= contractEnd.year)
-    : allYears
-  const years = endedYears.length ? endedYears : [contractEnd.year]
+  const termYears = allYears.filter(
+    (y) =>
+      (!contractStart || y >= contractStart.year) &&
+      (!contractEnd || y <= contractEnd.year),
+  )
+  const years = termYears.length
+    ? termYears
+    : [(contractEnd ?? contractStart).year]
   // Год мог пропасть вместе со сменой бренда или договора.
   const activeYear = years.includes(year)
     ? year
@@ -360,7 +366,7 @@ export default function Campaigns() {
     showMonths &&
     month != null &&
     isPassedMonth(activeYear, month) &&
-    !isAfterEnd(contractEnd, activeYear, month)
+    !isOutsideTerm(contractStart, contractEnd, activeYear, month)
       ? month
       : null
   // Внутри выбранного месяца переключаемся между отчётом и списком кампаний.
@@ -904,6 +910,7 @@ export default function Campaigns() {
             }
             counts={monthCounts}
             statuses={monthStatuses}
+            since={contractStart}
             until={contractEnd}
           />
         </div>
