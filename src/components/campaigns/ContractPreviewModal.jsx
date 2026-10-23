@@ -55,12 +55,15 @@ const PILLS = {
  * меняет только статус и месяцы, в которые договор виден на «Статусе оплаты».
  * `showBudget={false}` прячет плитку бюджета с историей выплат — так окно
  * открывается во вкладке «Договоры» рекламодателя, где денег нет.
+ * `period` — месяц `YYYY-MM`, открытый на странице: календарь месяцев его
+ * обводит.
  */
 export function ContractPreviewModal({
   contract,
   advertiser,
   onClose,
   showBudget = true,
+  period = null,
 }) {
   const { canEdit, isAdvertiser } = useAuth()
   // const { update } = useData()
@@ -369,6 +372,7 @@ export function ContractPreviewModal({
                     end={contract.end}
                     value={hidden}
                     onChange={setDraftHidden}
+                    marked={period}
                   />
                 </div>
               </div>

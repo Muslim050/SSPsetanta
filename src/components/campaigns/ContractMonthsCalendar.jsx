@@ -20,8 +20,16 @@ const monthIndex = (date) =>
  *
  * value — скрытые месяцы `YYYY-MM`, onChange получает новый список по
  * возрастанию — в том же виде его ждёт сервер (`hiddenMonths`).
+ * marked — месяц `YYYY-MM`, который сейчас смотрят на странице: он обведён,
+ * и календарь открывается на его году.
  */
-export function ContractMonthsCalendar({ start, end, value, onChange }) {
+export function ContractMonthsCalendar({
+  start,
+  end,
+  value,
+  onChange,
+  marked = null,
+}) {
   const currentYear = new Date().getFullYear()
   const from = monthIndex(start)
   const to = monthIndex(end)
@@ -35,9 +43,15 @@ export function ContractMonthsCalendar({ start, end, value, onChange }) {
     { length: lastYear - firstYear + 1 },
     (_, i) => firstYear + i,
   )
-  // Открываемся на текущем году, если он в сроке, иначе — на первом.
+  // Открываемся на году отмеченного месяца, иначе на текущем, если он в
+  // сроке, иначе — на первом.
+  const markedYear = marked ? Number(marked.slice(0, 4)) : null
   const [year, setYear] = useState(() =>
-    years.includes(currentYear) ? currentYear : firstYear,
+    years.includes(markedYear)
+      ? markedYear
+      : years.includes(currentYear)
+        ? currentYear
+        : firstYear,
   )
   const hidden = new Set(value)
 
@@ -63,6 +77,7 @@ export function ContractMonthsCalendar({ start, end, value, onChange }) {
             (from == null || at >= from) && (to == null || at <= to)
           const period = periodKey(year, month)
           const isHidden = hidden.has(period)
+          const isMarked = period === marked
           return (
             <button
               key={label}
@@ -70,11 +85,13 @@ export function ContractMonthsCalendar({ start, end, value, onChange }) {
               disabled={!inTerm}
               aria-pressed={inTerm ? !isHidden : undefined}
               onClick={() => toggle(period)}
-              title={
+              aria-current={isMarked ? 'true' : undefined}
+              title={cn(
                 inTerm
                   ? `${MONTHS_FULL[month]} ${year} — ${isHidden ? 'скрыт' : 'показан'}`
-                  : `${MONTHS_FULL[month]} ${year} — вне срока договора`
-              }
+                  : `${MONTHS_FULL[month]} ${year} — вне срока договора`,
+                isMarked && '· открыт на странице',
+              )}
               className={cn(
                 'rounded-lg py-1.5 text-[12px] font-medium transition-colors focus-ring',
                 !inTerm
@@ -82,6 +99,8 @@ export function ContractMonthsCalendar({ start, end, value, onChange }) {
                   : isHidden
                     ? 'bg-ink/6 text-ink-muted line-through hover:bg-ink/10'
                     : 'bg-indigo-100 text-indigo-900 hover:bg-indigo-200',
+                // Как выбранный месяц во вкладках страницы.
+                isMarked && 'font-semibold ring-2 ring-indigo-700',
               )}
             >
               {label}

@@ -720,6 +720,7 @@ export default function ContractOverview() {
         contract={previewFresh ?? preview?.contract ?? null}
         advertiser={preview?.advertiser ?? null}
         onClose={() => setPreviewId(null)}
+        period={activePeriod}
       />
 
       {moneyRow && (
