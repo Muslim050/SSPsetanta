@@ -347,7 +347,7 @@ export function ContractPreviewModal({
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <p className="text-[11px] font-medium uppercase tracking-wider text-ink-muted">
-                    Месяцы в «Статусе оплаты»
+                    Отображение статусов оплаты по месяцам
                   </p>
                   <p className="mt-2 text-[12px] text-ink-muted">
                     Нажмите на месяц, чтобы скрыть или показать договор.

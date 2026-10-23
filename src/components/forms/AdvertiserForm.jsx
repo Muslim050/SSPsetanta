@@ -682,7 +682,7 @@ export function AdvertiserForm({ open, onClose, initial }) {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <p className="text-[13px] font-medium text-ink-soft">
-                    Месяцы в «Статусе оплаты»
+                    Отображение статусов оплаты по месяцам
                   </p>
                   <p className="mt-1 text-[12px] text-ink-muted">
                     Нажмите на месяц, чтобы скрыть или показать договор.
