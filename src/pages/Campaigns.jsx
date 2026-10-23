@@ -19,9 +19,11 @@ import { useAuth } from '@/features/auth/useAuth'
 import { useVisibleAdvertisers } from '@/features/advertisers/queries'
 import { downloadFile } from '@/features/files/download'
 import {
+  useContractPayments,
   useDeletePayment,
-  useSaveContractAmounts,
+  useSaveContractMoney,
   useSetPaymentStatus,
+  useStatusLog,
   useUpdatePayment,
 } from '@/features/contracts/queries'
 import { useScopedCampaigns } from '@/lib/useScope.js'
@@ -246,7 +248,7 @@ export default function Campaigns() {
   // Бренды нужны ради их договоров: условия, суммы и статус оплаты живут там.
   const { data: advertisers = [] } = useVisibleAdvertisers()
   const advertiserById = (id) => advertisers.find((a) => a.id === id)
-  const { mutate: saveAmounts } = useSaveContractAmounts()
+  const { mutate: saveContractMoney } = useSaveContractMoney()
   const { mutate: savePaymentStatusFor, isPending: savingPaymentStatus } =
     useSetPaymentStatus()
   const { mutate: updatePayment } = useUpdatePayment()
@@ -335,6 +337,10 @@ export default function Campaigns() {
       : ((contractBrand?.contracts ?? []).find(
           (c) => c.number === activeContract,
         ) ?? null)
+  // История смен статуса оплаты — своим запросом, пока открыт поповер.
+  const { data: statusLog } = useStatusLog(
+    statusAnchor ? selectedContract?.id : null,
+  )
   // Показываем только месяцы срока договора — и годы только его.
   const contractStart = monthOfDate(selectedContract?.start)
   const contractEnd = monthOfDate(selectedContract?.end)
@@ -450,6 +456,8 @@ export default function Campaigns() {
   const moneyContract = money
     ? ((contractBrand?.contracts ?? []).find((c) => c.id === money.id) ?? null)
     : null
+  // История выплат — своим запросом, пока открыт поповер сумм.
+  const { data: moneyPayments } = useContractPayments(moneyContract?.id)
 
   /**
    * Смена бренда — это новый контекст: договоры у него свои, период
@@ -488,18 +496,18 @@ export default function Campaigns() {
         })
 
   /**
-   * Суммы договора. Прирост «Оплачено» сервер сам оформляет поступлением
-   * на выбранную дату — отдельного запроса на платёж не нужно.
+   * Суммы договора. Разовое поступление уходит отдельным платежом, ручная
+   * правка «Оплачено» — правкой сумм (см. useSaveContractMoney).
    */
-  const saveMoney = ({ budget, spent, paidAt }) => {
+  const saveMoney = ({ budget, spent, amount, paidAt }) => {
     if (!moneyContract) return
     const gained = spent - toNumber(moneyContract.spent)
     const number = moneyContract.number
 
-    saveAmounts(
+    saveContractMoney(
       {
-        id: moneyContract.id,
-        input: { budget: String(budget), spent: String(spent), paidAt },
+        contract: moneyContract,
+        money: { budget, spent, amount, paidAt },
       },
       {
         // Сохранили — закрываем поповер; при ошибке он остаётся с суммами.
@@ -1238,7 +1246,7 @@ export default function Campaigns() {
           title={`Договор ${moneyContract.number}`}
           budget={toNumber(moneyContract.budget)}
           spent={toNumber(moneyContract.spent)}
-          payments={moneyContract.payments ?? []}
+          payments={moneyPayments ?? moneyContract.payments ?? []}
           onRemovePayment={removePayment}
           onSave={saveMoney}
           onEditPayment={editPayment}
@@ -1252,7 +1260,7 @@ export default function Campaigns() {
           title={`Договор ${selectedContract.number}`}
           value={paymentStatus}
           options={PAYMENT_OPTIONS}
-          history={selectedContract.paymentLog ?? []}
+          history={statusLog ?? selectedContract.paymentLog ?? []}
           statusByPeriod={statusByPeriod}
           period={activePeriod ?? periodKey(activeYear, new Date().getMonth())}
           years={years}

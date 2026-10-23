@@ -274,7 +274,7 @@ export function AdvertiserForm({ open, onClose, initial }) {
     if (!ok) return
 
     deleteContract(
-      { advertiserId: source?.id ?? createdId, id: contract.id },
+      { id: contract.id },
       {
         onSuccess: () => {
           dropFromForm()

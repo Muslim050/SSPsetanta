@@ -195,7 +195,7 @@ export function ContractModal({ open, contract, advertiser, onClose }) {
     if (!ok) return
 
     deleteContract(
-      { advertiserId: advertiser.id, id: contract.id },
+      { id: contract.id },
       {
         onSuccess: () => {
           toast.info('Договор удалён')
