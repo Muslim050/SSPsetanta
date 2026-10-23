@@ -344,25 +344,20 @@ export function ContractPreviewModal({
 
           {showMonths && (
             <div className="mt-3 rounded-2xl border border-line bg-paper/55 p-4">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              {/* Широко: текст слева сверху, кнопка слева внизу — вровень с
+                  низом календаря справа. Узко: текст, календарь, кнопка. */}
+              <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_300px] sm:grid-rows-[auto_1fr]">
                 <div className="min-w-0">
-                  <p className="text-[11px] font-medium uppercase tracking-wider text-ink-muted">
+                  {/* Высотой с переключатель года — заголовок стоит вровень с
+                      ним. */}
+                  <p className="flex items-center text-[11px] font-medium uppercase tracking-wider text-ink-muted sm:min-h-[39px]">
                     Отображение статусов оплаты по месяцам
                   </p>
                   <p className="mt-2 text-[12px] text-ink-muted">
                     Нажмите на месяц, чтобы скрыть или показать договор.
                   </p>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    className="mt-3"
-                    disabled={!monthsChanged || saving}
-                    onClick={saveMonths}
-                  >
-                    {saving ? 'Сохраняем…' : 'Сохранить изменения'}
-                  </Button>
                 </div>
-                <div className="w-full shrink-0 sm:w-[300px]">
+                <div className="sm:col-start-2 sm:row-span-2 sm:row-start-1">
                   {/* key: у другого договора календарь открывается заново —
                       на своём году. */}
                   <ContractMonthsCalendar
@@ -373,6 +368,16 @@ export function ContractPreviewModal({
                     onChange={setDraftHidden}
                     marked={period}
                   />
+                </div>
+                <div className="sm:self-end">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    disabled={!monthsChanged || saving}
+                    onClick={saveMonths}
+                  >
+                    {saving ? 'Сохраняем…' : 'Сохранить изменения'}
+                  </Button>
                 </div>
               </div>
             </div>
