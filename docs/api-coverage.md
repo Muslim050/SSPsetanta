@@ -59,22 +59,22 @@
 
 ## contracts — 22/24
 
-|     | Метод  | Путь                                    | Где                                                                    |
-| --- | ------ | --------------------------------------- | ---------------------------------------------------------------------- |
-| ✅  | GET    | `/contracts`                            | Статус оплаты — список, бренд по `advertiserId`                        |
-| ➖  | POST   | `/contracts`                            | `advertiserId` только на чтение — создаём через бренд                  |
-| ✅  | GET    | `/contracts/{id}`                       | Статус оплаты — карточка договора (папочка)                            |
-| ➖  | PUT    | `/contracts/{id}`                       | заменяет договор целиком — правим через PATCH                          |
-| ✅  | PATCH  | `/contracts/{id}`                       | Статус оплаты, ContractModal, ContractPreviewModal                     |
-| ✅  | DELETE | `/contracts/{id}`                       | Карточка бренда (кнопка удаления), ContractModal                       |
-| ✅  | PATCH  | `/contracts/{id}/amounts`               | Статус оплаты, Размещения — ручная правка сумм                         |
-| ✅  | PATCH  | `/contracts/{id}/campaign-info`         | ContractModal (рекламодатель)                                          |
-| ✅  | PUT    | `/contracts/{id}/payment-status`        | Статус оплаты, Размещения                                              |
-| ✅  | GET    | `/contracts/{id}/payments`              | Статус оплаты, Размещения — история в поповере сумм                    |
-| ✅  | POST   | `/contracts/{id}/payments`              | Статус оплаты, Размещения — «разовое поступление», с `Idempotency-Key` |
-| ✅  | PATCH  | `/contracts/{id}/payments/{payment_id}` | Статус оплаты, Размещения                                              |
-| ✅  | DELETE | `/contracts/{id}/payments/{payment_id}` | Статус оплаты, Размещения                                              |
-| ✅  | GET    | `/contracts/{id}/status-log`            | Статус оплаты, Размещения — история в поповере статуса                 |
+|     | Метод  | Путь                                    | Где                                                                          |
+| --- | ------ | --------------------------------------- | ---------------------------------------------------------------------------- |
+| ✅  | GET    | `/contracts`                            | Статус оплаты — список, бренд по `advertiserId`; выбранный месяц — `?month=` |
+| ➖  | POST   | `/contracts`                            | `advertiserId` только на чтение — создаём через бренд                        |
+| ✅  | GET    | `/contracts/{id}`                       | Статус оплаты — карточка договора (папочка)                                  |
+| ➖  | PUT    | `/contracts/{id}`                       | заменяет договор целиком — правим через PATCH                                |
+| ✅  | PATCH  | `/contracts/{id}`                       | Статус оплаты, ContractModal, ContractPreviewModal (и `hiddenMonths`)        |
+| ✅  | DELETE | `/contracts/{id}`                       | Карточка бренда (кнопка удаления), ContractModal                             |
+| ✅  | PATCH  | `/contracts/{id}/amounts`               | Статус оплаты, Размещения — ручная правка сумм                               |
+| ✅  | PATCH  | `/contracts/{id}/campaign-info`         | ContractModal (рекламодатель)                                                |
+| ✅  | PUT    | `/contracts/{id}/payment-status`        | Статус оплаты, Размещения                                                    |
+| ✅  | GET    | `/contracts/{id}/payments`              | Статус оплаты, Размещения — история в поповере сумм                          |
+| ✅  | POST   | `/contracts/{id}/payments`              | Статус оплаты, Размещения — «разовое поступление», с `Idempotency-Key`       |
+| ✅  | PATCH  | `/contracts/{id}/payments/{payment_id}` | Статус оплаты, Размещения                                                    |
+| ✅  | DELETE | `/contracts/{id}/payments/{payment_id}` | Статус оплаты, Размещения                                                    |
+| ✅  | GET    | `/contracts/{id}/status-log`            | Статус оплаты, Размещения — история в поповере статуса                       |
 
 ### Отчёты договора — 10/10
 

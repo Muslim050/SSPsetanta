@@ -93,11 +93,16 @@ function monthBounds(year, month) {
   return [`${year}-${mm}-01`, `${year}-${mm}-${lastDay}`]
 }
 
-/** Договор попадает в месяц, если его срок пересекается с ним. */
+/**
+ * Договор попадает в месяц, если его срок пересекается с ним и месяц не
+ * скрыт в `hiddenMonths` (их задают в карточке договора) — так же отбирает
+ * и `GET /contracts?month=`.
+ */
 function inMonth(contract, year, month) {
   const from = contract.start || contract.end
   const to = contract.end || contract.start
   if (!from || !to) return false
+  if (contract.hiddenMonths?.includes(periodKey(year, month))) return false
   const [start, end] = monthBounds(year, month)
   return from <= end && to >= start
 }
@@ -170,9 +175,11 @@ export default function ContractOverview() {
   const [creating, setCreating] = useState(false)
 
   // Рекламодатель видит только свои договоры, площадка — все.
-  const rows = isAdvertiser
-    ? allRows.filter(({ advertiser }) => advertiser.id === user.advertiserId)
-    : allRows
+  const own = (list) =>
+    isAdvertiser
+      ? list.filter(({ advertiser }) => advertiser.id === user.advertiserId)
+      : list
+  const rows = own(allRows)
 
   const preview = rows.find(({ contract }) => contract.id === previewId)
   // Карточка договора читает его по своему адресу; пока ответа нет — из списка.
@@ -223,13 +230,27 @@ export default function ContractOverview() {
     return acc
   }, {})
 
-  // Выбран месяц — и таблица, и сводка считаются только по нему.
+  // Выбран месяц — и таблица, и сводка считаются только по нему. Договоры
+  // месяца отбирает сервер (`GET /contracts?month=`): срок задевает месяц, и
+  // месяц не скрыт. Пока он не ответил (или не смог) — то же правило на
+  // клиенте, чтобы сводка не мигала нулями. Счётчики и цвет вкладок считаем
+  // сами по общему списку: иначе было бы по запросу на каждый из 12 месяцев.
+  const monthList = useContracts({
+    month: activePeriod,
+    enabled: activePeriod != null,
+  })
   const scoped =
     activeMonth == null
       ? rows
-      : rows.filter(({ contract }) =>
-          inMonth(contract, activeYear, activeMonth),
-        )
+      : !monthList.isPending && !monthList.isError
+        ? own(monthList.rows)
+        : rows.filter(({ contract }) =>
+            inMonth(contract, activeYear, activeMonth),
+          )
+  // Ошибка общего списка или списка выбранного месяца — таблицы нет.
+  const listError = isError || (activeMonth != null && monthList.isError)
+  const retryList = () =>
+    activeMonth != null && monthList.isError ? monthList.refetch() : refetch()
 
   const query = q.trim().toLowerCase()
   const filtered = scoped.filter(({ contract, advertiser }) =>
@@ -515,14 +536,16 @@ export default function ContractOverview() {
         />
       </div>
 
-      {isError ? (
+      {listError ? (
         <Card>
           <EmptyState
             icon={FileText}
             title="Не удалось загрузить договоры"
-            description={error?.message ?? 'Попробуйте ещё раз.'}
+            description={
+              (error ?? monthList.error)?.message ?? 'Попробуйте ещё раз.'
+            }
             action={
-              <Button variant="secondary" onClick={() => refetch()}>
+              <Button variant="secondary" onClick={retryList}>
                 Повторить
               </Button>
             }
@@ -697,6 +720,7 @@ export default function ContractOverview() {
         contract={previewFresh ?? preview?.contract ?? null}
         advertiser={preview?.advertiser ?? null}
         onClose={() => setPreviewId(null)}
+        period={activePeriod}
       />
 
       {moneyRow && (

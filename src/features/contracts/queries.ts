@@ -19,7 +19,9 @@ import type {
  */
 export const contractKeys = {
   all: [...advertiserKeys.all, 'contracts'] as const,
-  list: () => [...contractKeys.all, 'list'] as const,
+  /** month — договоры месяца `YYYY-MM` (без скрытых в нём); null — все. */
+  list: (month: string | null = null) =>
+    [...contractKeys.all, 'list', month] as const,
   one: (id: number) => [...contractKeys.all, 'one', id] as const,
   payments: (id: number) => [...contractKeys.all, 'payments', id] as const,
   statusLog: (id: number) => [...contractKeys.all, 'status-log', id] as const,
@@ -38,14 +40,22 @@ export interface ContractRow {
  * брендов: рядом с договором экран показывает название, логотип и цвет.
  * Список брендов — тот же запрос, что у «Рекламодателей», он делится
  * между экранами через кэш. Договор без бренда в списке не показываем.
+ *
+ * `month` (`YYYY-MM`) — только договоры, чей срок задевает месяц, кроме тех,
+ * у кого он в `hiddenMonths`: фильтрует сервер. `enabled: false` — не
+ * спрашиваем (например, месяц не выбран).
  */
-export function useContracts() {
+export function useContracts({
+  month = null,
+  enabled = true,
+}: { month?: string | null; enabled?: boolean } = {}) {
   const contracts = useQuery({
-    queryKey: contractKeys.list(),
+    queryKey: contractKeys.list(month),
     queryFn: (): Promise<Contract[]> =>
       fetchAllPages((cursor) =>
-        contractsApi.list({ cursor, limit: PAGE_SIZE }),
+        contractsApi.list({ cursor, limit: PAGE_SIZE, month }),
       ),
+    enabled,
   })
   const advertisers = useAdvertisers()
 
