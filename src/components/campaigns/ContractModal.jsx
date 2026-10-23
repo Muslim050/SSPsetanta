@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/Button'
 import { Field, Input, Select } from '@/components/ui/Field'
 import { MultiSelect } from '@/components/ui/MultiSelect.jsx'
 import { FilePicker } from '@/components/ui/FilePicker.jsx'
+import { DatePicker } from '@/components/ui/DatePicker.jsx'
 import {
   CONTRACT_STATUS,
   LEAGUES,
@@ -350,19 +351,19 @@ export function ContractModal({ open, contract, advertiser, onClose }) {
           {/* Срок договора идёт первым — с него заполняют карточку. */}
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Начало">
-              <Input
-                type="date"
+              <DatePicker
                 value={form.start}
                 max={form.end || undefined}
-                onChange={(e) => set('start', e.target.value)}
+                onChange={(value) => set('start', value)}
+                clearable
               />
             </Field>
             <Field label="Окончание">
-              <Input
-                type="date"
+              <DatePicker
                 value={form.end}
                 min={form.start || undefined}
-                onChange={(e) => set('end', e.target.value)}
+                onChange={(value) => set('end', value)}
+                clearable
               />
             </Field>
           </div>
