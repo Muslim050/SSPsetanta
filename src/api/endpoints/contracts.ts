@@ -24,9 +24,18 @@ export type ListParams = {
   advertiserId?: number
   cursor?: string | null
   limit?: number
+  /**
+   * `YYYY-MM` — договоры, чей срок пересекает месяц хотя бы одним днём,
+   * кроме тех, у кого он в `hiddenMonths`. Без него скрытые месяцы ни на что
+   * не влияют.
+   */
+  month?: string | null
 }
 
-/** GET /contracts — одна страница. Бренд договора — в `advertiserId`. */
+/**
+ * GET /contracts — одна страница. Бренд договора — в `advertiserId`. Только
+ * для площадки (`admin`).
+ */
 export function list(params: ListParams = {}): Promise<Paginated<Contract>> {
   return request<Paginated<Contract>>(`/contracts${buildQuery(params)}`)
 }
