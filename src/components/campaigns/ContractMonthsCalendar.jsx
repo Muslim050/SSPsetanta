@@ -46,13 +46,15 @@ export function ContractMonthsCalendar({
   // Открываемся на году отмеченного месяца, иначе на текущем, если он в
   // сроке, иначе — на первом.
   const markedYear = marked ? Number(marked.slice(0, 4)) : null
-  const [year, setYear] = useState(() =>
-    years.includes(markedYear)
-      ? markedYear
-      : years.includes(currentYear)
-        ? currentYear
-        : firstYear,
-  )
+  const defaultYear = years.includes(markedYear)
+    ? markedYear
+    : years.includes(currentYear)
+      ? currentYear
+      : firstYear
+  const [pickedYear, setYear] = useState(defaultYear)
+  // Срок могли поменять в форме — выбранный год вышел из него: берём год по
+  // умолчанию, иначе стрелки застряли бы на чужом годе.
+  const year = years.includes(pickedYear) ? pickedYear : defaultYear
   const hidden = new Set(value)
 
   const toggle = (period) => {
