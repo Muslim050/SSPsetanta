@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/Button'
 import { Field, Input, Select, Textarea } from '@/components/ui/Field'
 import { MultiSelect } from '@/components/ui/MultiSelect.jsx'
 import { FilePicker } from '@/components/ui/FilePicker.jsx'
+import { DatePicker } from '@/components/ui/DatePicker.jsx'
 import { SegmentTabs } from '@/components/ui/Tabs.jsx'
 import { ContractMonthsCalendar } from '@/components/campaigns/ContractMonthsCalendar.jsx'
 import { Switch } from '@/components/ui/Switch.jsx'
@@ -659,23 +660,19 @@ export function AdvertiserForm({ open, onClose, initial }) {
             {/* Срок договора идёт первым — с него заполняют карточку. */}
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Начало">
-                <Input
-                  type="date"
+                <DatePicker
                   value={contract.start}
                   max={contract.end || undefined}
-                  onChange={(e) =>
-                    setContract(contract.id, { start: e.target.value })
-                  }
+                  onChange={(start) => setContract(contract.id, { start })}
+                  clearable
                 />
               </Field>
               <Field label="Окончание">
-                <Input
-                  type="date"
+                <DatePicker
                   value={contract.end}
                   min={contract.start || undefined}
-                  onChange={(e) =>
-                    setContract(contract.id, { end: e.target.value })
-                  }
+                  onChange={(end) => setContract(contract.id, { end })}
+                  clearable
                 />
               </Field>
             </div>
