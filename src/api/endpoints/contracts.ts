@@ -1,17 +1,57 @@
 import { request } from '../client'
-import type { Contract, ContractInput, PaymentStatus } from '../types'
+import { buildQuery } from '../query'
+import type {
+  Contract,
+  ContractInput,
+  ContractStatusEntry,
+  Paginated,
+  Payment,
+  PaymentStatus,
+} from '../types'
 
 /**
  * Договор — самостоятельный ресурс: у него свой адрес, не зависящий от
- * бренда. Заводятся и удаляются договоры внутри бренда
- * (`/advertisers/:id/contracts`, см. `endpoints/advertisers.ts`), а правятся
- * по своему адресу — им и пользуется раздел «Contract Overview».
+ * бренда. Заводятся договоры внутри бренда (`/advertisers/:id/contracts`,
+ * см. `endpoints/advertisers.ts`): у `POST /contracts` поле `advertiserId`
+ * только на чтение, бренд там не задать. Читаются, правятся и удаляются —
+ * по своему адресу.
  *
- * Список `GET /contracts` здесь не нужен: договор не знает своего бренда
- * (`advertiserId` в ответе нет), а на экране рядом с каждым договором стоит
- * карточка бренда. Поэтому договоры берутся из `GET /advertisers`, где они
- * приходят вложенными.
+ * `PUT /contracts/:id` не используем: он заменяет договор целиком,
+ * а всё нужное делает `PATCH`.
  */
+
+export type ListParams = {
+  advertiserId?: number
+  cursor?: string | null
+  limit?: number
+}
+
+/** GET /contracts — одна страница. Бренд договора — в `advertiserId`. */
+export function list(params: ListParams = {}): Promise<Paginated<Contract>> {
+  return request<Paginated<Contract>>(`/contracts${buildQuery(params)}`)
+}
+
+/** GET /contracts/:id */
+export function get(id: number): Promise<Contract> {
+  return request<Contract>(`/contracts/${id}`)
+}
+
+/** DELETE /contracts/:id — отказ по существу приходит 409. */
+export function remove(id: number): Promise<void> {
+  return request<void>(`/contracts/${id}`, { method: 'DELETE' })
+}
+
+/**
+ * GET /contracts/:id/status-log — история смен статуса оплаты, курсорная.
+ */
+export function statusLog(
+  id: number,
+  params: { cursor?: string | null; limit?: number } = {},
+): Promise<Paginated<ContractStatusEntry>> {
+  return request<Paginated<ContractStatusEntry>>(
+    `/contracts/${id}/status-log${buildQuery(params)}`,
+  )
+}
 
 /** PATCH /contracts/:id — условия договора: срок, пакет, лиги, статус. */
 export function update(id: number, input: ContractInput): Promise<Contract> {
@@ -78,8 +118,35 @@ export function setPaymentStatus(
   })
 }
 
-/** Поступление правится и удаляется внутри своего договора. */
+/** Поступления живут внутри своего договора. */
 export const payments = {
+  /**
+   * GET /contracts/:id/payments — история выплат. В схеме ответ описан
+   * одним поступлением, по смыслу это список: принимаем и массив,
+   * и страницу `{ items }`.
+   */
+  async list(contractId: number): Promise<Payment[]> {
+    const data = await request<Payment[] | Paginated<Payment>>(
+      `/contracts/${contractId}/payments`,
+    )
+    return Array.isArray(data) ? data : (data?.items ?? [])
+  },
+  /**
+   * POST /contracts/:id/payments — новое поступление, сервер прибавляет его
+   * к «Оплачено». `idempotencyKey` — один на попытку внести это поступление:
+   * повтор после обрыва связи не задвоит деньги.
+   */
+  create(
+    contractId: number,
+    input: { amount: string; paidAt: string; comment?: string },
+    idempotencyKey: string,
+  ): Promise<Payment> {
+    return request<Payment>(`/contracts/${contractId}/payments`, {
+      method: 'POST',
+      body: input,
+      headers: { 'Idempotency-Key': idempotencyKey },
+    })
+  },
   /** PATCH /contracts/:id/payments/:paymentId — отдаёт весь договор. */
   update(
     contractId: number,

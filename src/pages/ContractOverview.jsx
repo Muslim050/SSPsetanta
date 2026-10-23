@@ -15,10 +15,14 @@ import { useAuth } from '@/features/auth/useAuth'
 // Договоры переехали на сервер. Мок остаётся для разделов, которые ещё
 // не подключены: import { useData } from '@/context/DataContext.jsx'
 import {
+  useBrandContract,
+  useContract,
+  useContractPayments,
   useContracts,
   useDeletePayment,
-  useSaveContractAmounts,
+  useSaveContractMoney,
   useSetPaymentStatus,
+  useStatusLog,
   useUpdateContract,
   useUpdatePayment,
 } from '@/features/contracts/queries'
@@ -141,7 +145,7 @@ export default function ContractOverview() {
   // const { advertisers, update } = useData()
   const { rows: allRows, isPending, isError, error, refetch } = useContracts()
   const { mutate: updateContract } = useUpdateContract()
-  const { mutate: saveAmounts } = useSaveContractAmounts()
+  const { mutate: saveContractMoney } = useSaveContractMoney()
   const { mutate: savePaymentStatusFor, isPending: savingPaymentStatus } =
     useSetPaymentStatus()
   const { mutate: updatePayment } = useUpdatePayment()
@@ -171,10 +175,22 @@ export default function ContractOverview() {
     : allRows
 
   const preview = rows.find(({ contract }) => contract.id === previewId)
+  // Карточка договора читает его по своему адресу; пока ответа нет — из списка.
+  const { data: previewFresh } = useContract(preview?.contract.id)
   const moneyRow = rows.find(({ contract }) => contract.id === moneyAnchor?.id)
+  // Поповер сумм читает договор отдельным запросом через бренд; пока ответа
+  // нет — показываем тот, что пришёл в списке.
+  const { data: moneyFresh } = useBrandContract(
+    moneyRow?.advertiser.id,
+    moneyRow?.contract.id,
+  )
+  const moneyContract = moneyFresh ?? moneyRow?.contract
+  // История выплат и история статусов — своими запросами, пока открыт поповер.
+  const { data: moneyPayments } = useContractPayments(moneyRow?.contract.id)
   const paymentRow = rows.find(
     ({ contract }) => contract.id === paymentAnchor?.id,
   )
+  const { data: statusLog } = useStatusLog(paymentRow?.contract.id)
   // Деньги и статус оплаты ведёт площадка: рекламодателю они только видны.
   const canEditMoney = canEdit && !isAdvertiser
 
@@ -262,20 +278,16 @@ export default function ContractOverview() {
       : payments.reduce((sum, payment) => sum + toNumber(payment.amount), 0)
 
   /**
-   * Суммы договора. Прирост «Оплачено» сервер сам оформляет поступлением
-   * на выбранную дату — отдельного запроса на платёж не нужно.
+   * Суммы договора. Разовое поступление уходит отдельным платежом, ручная
+   * правка «Оплачено» — правкой сумм (см. useSaveContractMoney).
    */
-  const saveMoney = ({ budget, spent, paidAt }) => {
-    const contract = moneyRow?.contract
+  const saveMoney = ({ budget, spent, amount, paidAt }) => {
+    const contract = moneyContract
     if (!contract) return
     const gained = spent - toNumber(contract.spent)
 
-    saveAmounts(
-      {
-        id: contract.id,
-        // Суммы на сервере — decimal, то есть строки.
-        input: { budget: String(budget), spent: String(spent), paidAt },
-      },
+    saveContractMoney(
+      { contract, money: { budget, spent, amount, paidAt } },
       {
         // Сохранили — закрываем поповер; при ошибке он остаётся с суммами.
         onSuccess: () => {
@@ -294,7 +306,7 @@ export default function ContractOverview() {
 
   /** Правка даты и времени уже внесённого поступления. */
   const editPayment = (paymentId, localValue) => {
-    const contract = moneyRow?.contract
+    const contract = moneyContract
     if (!contract || !localValue) return
     const paidAt = new Date(localValue)
     if (Number.isNaN(paidAt.getTime())) return
@@ -314,7 +326,7 @@ export default function ContractOverview() {
 
   /** Удаление поступления: сумма вычитается из оплаченного по договору. */
   const removePayment = async (paymentId) => {
-    const contract = moneyRow?.contract
+    const contract = moneyContract
     const entry = (contract?.payments ?? []).find(
       (item) => item.id === paymentId,
     )
@@ -682,7 +694,7 @@ export default function ContractOverview() {
       )}
 
       <ContractPreviewModal
-        contract={preview?.contract ?? null}
+        contract={previewFresh ?? preview?.contract ?? null}
         advertiser={preview?.advertiser ?? null}
         onClose={() => setPreviewId(null)}
       />
@@ -690,10 +702,10 @@ export default function ContractOverview() {
       {moneyRow && (
         <MoneyPopover
           anchorEl={moneyAnchor.el}
-          title={`Договор ${moneyRow.contract.number}`}
-          budget={toNumber(moneyRow.contract.budget)}
-          spent={toNumber(moneyRow.contract.spent)}
-          payments={moneyRow.contract.payments ?? []}
+          title={`Договор ${moneyContract.number}`}
+          budget={toNumber(moneyContract.budget)}
+          spent={toNumber(moneyContract.spent)}
+          payments={moneyPayments ?? moneyContract.payments ?? []}
           onSave={saveMoney}
           onEditPayment={editPayment}
           onRemovePayment={removePayment}
@@ -707,7 +719,7 @@ export default function ContractOverview() {
           title={`Договор ${paymentRow.contract.number}`}
           value={statusAt(paymentRow.contract, activePeriod) ?? 'awaiting'}
           options={STATUS_OPTIONS}
-          history={paymentRow.contract.paymentLog ?? []}
+          history={statusLog ?? paymentRow.contract.paymentLog ?? []}
           statusByPeriod={paymentRow.contract.paymentStatusByPeriod ?? {}}
           period={activePeriod ?? periodKey(activeYear, new Date().getMonth())}
           years={years}
