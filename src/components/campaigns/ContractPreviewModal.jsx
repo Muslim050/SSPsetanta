@@ -29,6 +29,7 @@ import { Button } from '@/components/ui/Button'
 import { Progress } from '@/components/ui/Progress.jsx'
 import { AnchoredPopover } from '@/components/ui/AnchoredPopover.jsx'
 import { ContractTile } from '@/components/campaigns/CampaignPreviewModal.jsx'
+import { ContractMonthsCalendar } from '@/components/campaigns/ContractMonthsCalendar.jsx'
 import { cn } from '@/lib/cn.js'
 import { advertiserLogo } from '@/features/advertisers/logo'
 
@@ -50,7 +51,8 @@ const PILLS = {
 
 /**
  * Карточка договора: те же плитки, что и в карточке кампании, но условия
- * берём из самого договора. Правки живут в ContractModal — здесь только чтение.
+ * берём из самого договора. Правки живут в ContractModal — здесь площадка
+ * меняет только статус и месяцы, в которые договор виден на «Статусе оплаты».
  * `showBudget={false}` прячет плитку бюджета с историей выплат — так окно
  * открывается во вкладке «Договоры» рекламодателя, где денег нет.
  */
@@ -62,7 +64,7 @@ export function ContractPreviewModal({
 }) {
   const { canEdit, isAdvertiser } = useAuth()
   // const { update } = useData()
-  const { mutate: updateContract } = useUpdateContract()
+  const { mutate: updateContract, isPending: saving } = useUpdateContract()
   const toast = useToast()
   const [showPayments, setShowPayments] = useState(false)
   // Кнопка статуса, от которой открыт выбор; null — выбор закрыт.
@@ -71,6 +73,31 @@ export function ContractPreviewModal({
   // Статус договора ведёт площадка: рекламодателю он только показывается.
   const canEditStatus = canEdit && !isAdvertiser
   const status = contract?.status ?? 'active'
+
+  // Месяцы, в которые договор не показываем на «Статусе оплаты», — тоже
+  // площадка. Правим черновиком, на сервер — по «Сохранить месяцы»; null —
+  // черновика нет, показываем сохранённые.
+  const [draftHidden, setDraftHidden] = useState(null)
+  const savedHidden = [...(contract?.hiddenMonths ?? [])].sort()
+  const hidden = draftHidden ?? savedHidden
+  const monthsChanged = hidden.join() !== savedHidden.join()
+  // Без дат у договора нет месяцев — и календаря нет.
+  const showMonths = canEditStatus && !!(contract?.start || contract?.end)
+
+  const saveMonths = () =>
+    updateContract(
+      { id: contract.id, input: { hiddenMonths: hidden } },
+      {
+        // Сохранили — закрываем карточку; при ошибке она остаётся с черновиком.
+        onSuccess: () => {
+          setDraftHidden(null)
+          toast.success(`Договор ${contract.number}: месяцы сохранены`)
+          onClose()
+        },
+        onError: (err) =>
+          toast.error(err.message || 'Не удалось сохранить месяцы договора'),
+      },
+    )
 
   const setStatus = (next) => {
     setStatusAnchor(null)
@@ -88,10 +115,11 @@ export function ContractPreviewModal({
     )
   }
 
-  // Открыли другой договор — историю снова прячем.
+  // Открыли другой договор — историю снова прячем, черновик месяцев сбрасываем.
   useEffect(() => {
     setShowPayments(false)
     setStatusAnchor(null)
+    setDraftHidden(null)
   }, [contract?.id])
 
   // Суммы приходят decimal-строками — в расчётах они нужны числами.
@@ -307,6 +335,42 @@ export function ContractPreviewModal({
                     </div>
                   ))
                 )}
+              </div>
+            </div>
+          )}
+
+          {showMonths && (
+            <div className="mt-3 rounded-2xl border border-line bg-paper/55 p-4">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-ink-muted">
+                    Месяцы на «Статусе оплаты»
+                  </p>
+                  <p className="mt-2 text-[12px] text-ink-muted">
+                    В серых месяцах договор там не показывается. Нажмите месяц,
+                    чтобы скрыть или показать его.
+                  </p>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    className="mt-3"
+                    disabled={!monthsChanged || saving}
+                    onClick={saveMonths}
+                  >
+                    {saving ? 'Сохраняем…' : 'Сохранить месяцы'}
+                  </Button>
+                </div>
+                <div className="w-full shrink-0 sm:w-[300px]">
+                  {/* key: у другого договора календарь открывается заново —
+                      на своём году. */}
+                  <ContractMonthsCalendar
+                    key={contract.id}
+                    start={contract.start}
+                    end={contract.end}
+                    value={hidden}
+                    onChange={setDraftHidden}
+                  />
+                </div>
               </div>
             </div>
           )}

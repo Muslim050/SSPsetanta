@@ -93,11 +93,16 @@ function monthBounds(year, month) {
   return [`${year}-${mm}-01`, `${year}-${mm}-${lastDay}`]
 }
 
-/** Договор попадает в месяц, если его срок пересекается с ним. */
+/**
+ * Договор попадает в месяц, если его срок пересекается с ним и месяц не
+ * скрыт в `hiddenMonths` (их задают в карточке договора) — так же отбирает
+ * и `GET /contracts?month=`.
+ */
 function inMonth(contract, year, month) {
   const from = contract.start || contract.end
   const to = contract.end || contract.start
   if (!from || !to) return false
+  if (contract.hiddenMonths?.includes(periodKey(year, month))) return false
   const [start, end] = monthBounds(year, month)
   return from <= end && to >= start
 }

@@ -100,6 +100,13 @@ export interface Contract {
   end: string | null
   paymentDate: string | null
   status: ContractStatus
+  /**
+   * Месяцы срока `YYYY-MM`, в которые договор не показываем на «Статусе
+   * оплаты» (`GET /contracts?month=` их тоже не отдаёт). Присланный список
+   * заменяет прежний целиком, `[]` снимает все скрытия; месяц вне срока —
+   * 400. При смене срока месяцы вне нового сервер отбрасывает.
+   */
+  hiddenMonths: string[]
   budget: string
   spent: string
   paymentStatus: PaymentStatus
@@ -131,6 +138,7 @@ export type ContractInput = Partial<
     | 'end'
     | 'paymentDate'
     | 'status'
+    | 'hiddenMonths'
   >
 > & {
   /** Скан договора: id из загрузчика файлов. `null` — убрать файл. */
