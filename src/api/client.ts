@@ -52,6 +52,8 @@ export interface RequestOptions {
   /** FormData уходит как есть — её Content-Type с границей ставит браузер. */
   body?: unknown
   signal?: AbortSignal
+  /** Дополнительные заголовки, например `Idempotency-Key`. */
+  headers?: Record<string, string>
 }
 
 async function parseError(response: Response): Promise<ApiError> {
@@ -70,7 +72,7 @@ async function parseError(response: Response): Promise<ApiError> {
 
 async function send(
   path: string,
-  { method = 'GET', body, signal }: RequestOptions,
+  { method = 'GET', body, signal, headers }: RequestOptions,
   withAuth: boolean,
 ): Promise<Response> {
   const access = withAuth ? getAccessToken() : null
@@ -83,6 +85,7 @@ async function send(
         // У multipart свой Content-Type с границей — его ставит браузер.
         ...(body && !isForm ? { 'Content-Type': 'application/json' } : {}),
         ...(access ? { Authorization: `Bearer ${access}` } : {}),
+        ...headers,
       },
       body: body
         ? isForm

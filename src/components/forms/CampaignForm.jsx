@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { FilePicker } from '@/components/ui/FilePicker.jsx'
+import { DatePicker } from '@/components/ui/DatePicker.jsx'
 import { absoluteUrl } from '@/api/endpoints/files'
 import { Logo } from '@/components/Logo'
 import { PACKAGES, STATUS, leagueLabel, statusLabel } from '@/lib/metrics.js'
@@ -312,19 +313,17 @@ export function CampaignForm({ open, onClose, initial, defaultAdvertiserId }) {
           </p>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Начало периода" required error={errors.startDate}>
-              <Input
-                type="date"
+              <DatePicker
                 value={form.startDate}
                 max={form.endDate || undefined}
-                onChange={(e) => set('startDate', e.target.value)}
+                onChange={(value) => set('startDate', value)}
               />
             </Field>
             <Field label="Окончание периода" required error={errors.endDate}>
-              <Input
-                type="date"
+              <DatePicker
                 value={form.endDate}
                 min={form.startDate || undefined}
-                onChange={(e) => set('endDate', e.target.value)}
+                onChange={(value) => set('endDate', value)}
               />
             </Field>
           </div>

@@ -44,6 +44,10 @@ export function remove(id: number): Promise<void> {
  * эндпоинтами, по одному.
  */
 export const contracts = {
+  /** GET /advertisers/:id/contracts/:contractId — свежий договор с поступлениями. */
+  get(advertiserId: number, id: number): Promise<Contract> {
+    return request<Contract>(`/advertisers/${advertiserId}/contracts/${id}`)
+  },
   create(advertiserId: number, input: ContractInput): Promise<Contract> {
     return request<Contract>(`/advertisers/${advertiserId}/contracts`, {
       method: 'POST',

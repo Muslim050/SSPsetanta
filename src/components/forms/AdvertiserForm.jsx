@@ -16,7 +16,9 @@ import { Button } from '@/components/ui/Button'
 import { Field, Input, Select, Textarea } from '@/components/ui/Field'
 import { MultiSelect } from '@/components/ui/MultiSelect.jsx'
 import { FilePicker } from '@/components/ui/FilePicker.jsx'
+import { DatePicker } from '@/components/ui/DatePicker.jsx'
 import { SegmentTabs } from '@/components/ui/Tabs.jsx'
+import { ContractMonthsCalendar } from '@/components/campaigns/ContractMonthsCalendar.jsx'
 import { Switch } from '@/components/ui/Switch.jsx'
 import { ADV_STATUS, LEAGUES, PACKAGES } from '@/lib/metrics.js'
 import { uid } from '@/lib/id.js'
@@ -62,10 +64,24 @@ const contractsFingerprint = (contracts = []) =>
       start: contract.start ?? '',
       end: contract.end ?? '',
       paymentDate: contract.paymentDate ?? '',
+      hiddenMonths: hiddenInTerm(contract),
       file: contract.file?.url ?? null,
       creative: contract.creative?.url ?? null,
     })),
   )
+
+/**
+ * Скрытые месяцы договора, что лежат в его сроке, по возрастанию. Срок могли
+ * сузить в форме — месяц вне срока сервер не примет (400), такие отбрасываем.
+ */
+const hiddenInTerm = (contract) =>
+  (contract.hiddenMonths ?? [])
+    .filter(
+      (period) =>
+        (!contract.start || period >= contract.start.slice(0, 7)) &&
+        (!contract.end || period <= contract.end.slice(0, 7)),
+    )
+    .sort()
 
 /**
  * Логотип для формы. Загруженный файл приходит отдельным полем `logoFile`;
@@ -115,6 +131,8 @@ const newContract = (legalName = '') => ({
   start: '',
   end: '',
   paymentDate: `${new Date().getFullYear()}-08-31`,
+  // Месяцы срока, в которые договор не показываем на «Статусе оплаты».
+  hiddenMonths: [],
   file: null,
   // Ролик договора — подставляется в кампании по этому договору.
   creative: null,
@@ -137,6 +155,7 @@ const toContractInput = (contract, before) => ({
   start: dateOrNull(contract.start),
   end: dateOrNull(contract.end),
   paymentDate: dateOrNull(contract.paymentDate),
+  hiddenMonths: hiddenInTerm(contract),
   ...contractFileInput(contract, before),
 })
 
@@ -156,6 +175,7 @@ const formFrom = (advertiser) => ({
   contracts: (advertiser.contracts ?? []).map((contract) => ({
     ...contract,
     leagues: [...(contract.leagues ?? [])],
+    hiddenMonths: [...(contract.hiddenMonths ?? [])].sort(),
   })),
 })
 
@@ -274,7 +294,7 @@ export function AdvertiserForm({ open, onClose, initial }) {
     if (!ok) return
 
     deleteContract(
-      { advertiserId: source?.id ?? createdId, id: contract.id },
+      { id: contract.id },
       {
         onSuccess: () => {
           dropFromForm()
@@ -640,26 +660,45 @@ export function AdvertiserForm({ open, onClose, initial }) {
             {/* Срок договора идёт первым — с него заполняют карточку. */}
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Начало">
-                <Input
-                  type="date"
+                <DatePicker
                   value={contract.start}
                   max={contract.end || undefined}
-                  onChange={(e) =>
-                    setContract(contract.id, { start: e.target.value })
-                  }
+                  onChange={(start) => setContract(contract.id, { start })}
+                  clearable
                 />
               </Field>
               <Field label="Окончание">
-                <Input
-                  type="date"
+                <DatePicker
                   value={contract.end}
                   min={contract.start || undefined}
-                  onChange={(e) =>
-                    setContract(contract.id, { end: e.target.value })
-                  }
+                  onChange={(end) => setContract(contract.id, { end })}
+                  clearable
                 />
               </Field>
             </div>
+
+            {/* Месяцы срока на «Статусе оплаты» — появляются вместе с датами. */}
+            {(contract.start || contract.end) && (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <p className="text-[13px] font-medium text-ink-soft">
+                    Месяцы на «Статусе оплаты»
+                  </p>
+                  <p className="mt-1 text-[12px] text-ink-muted">
+                    В серых месяцах договор там не показывается. Нажмите месяц,
+                    чтобы скрыть или показать его.
+                  </p>
+                </div>
+                <ContractMonthsCalendar
+                  start={contract.start}
+                  end={contract.end}
+                  value={hiddenInTerm(contract)}
+                  onChange={(hiddenMonths) =>
+                    setContract(contract.id, { hiddenMonths })
+                  }
+                />
+              </div>
+            )}
 
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Номер договора" required>
