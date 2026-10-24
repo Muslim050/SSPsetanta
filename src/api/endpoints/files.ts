@@ -38,7 +38,7 @@ export function isStoredUrl(url: string | null | undefined): boolean {
 /**
  * Абсолютный адрес файла. Загрузчик отвечает относительной ссылкой — её
  * доводит до сервера прокси, но когда фронт ходит к API напрямую
- * (`VITE_API_URL`), origin приходится добавлять самим.
+ * (`VITE_BASE_URL`), origin приходится добавлять самим.
  */
 export function absoluteUrl(url: string): string {
   if (!url || /^https?:\/\//i.test(url)) return url

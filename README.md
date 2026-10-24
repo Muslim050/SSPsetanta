@@ -102,13 +102,21 @@ src/router.tsx    — дерево маршрутов TanStack Router; дост�
 | `preProd` | `setanta-preprod` | <https://setantastaging.pythonanywhere.com> |
 | `master`  | `setanta-prod`    | <https://setanta.pythonanywhere.com>        |
 
-**CORS.** Сервер не отдаёт `Access-Control-Allow-Origin`, поэтому напрямую из
-браузера к нему не достучаться. Запросы идут на собственный origin, а дальше их
+**CORS.** Сервер пускает только `https://setantadev.vercel.app`, поэтому
+остальным origin'ам напрямую к нему не достучаться. Запросы идут на собственный origin, а дальше их
 переправляет прокси. Локально это `server.proxy` в `vite.config.js`, адрес — из
 `API_PROXY_TARGET` в `.env`. На Vercel — правило «API Proxy» в Routing rules
 каждого проекта (`vercel routes`): оно главнее `vercel.json` и применяется без
-передеплоя. В `vercel.json` остаётся только SPA-fallback. Когда на бэкенде
-настроят CORS, прокси можно убрать и указать адрес в `VITE_API_URL`.
+передеплоя. В `vercel.json` остаётся только SPA-fallback.
+
+**Запросы мимо прокси.** Прокси Vercel гонит тело через свой узел — из
+Ташкента через Гонконг в США — и ролик на 66 МБ идёт 73 с против ~15 с
+напрямую. `VITE_BASE_URL` отправляет все запросы прямо на бэкенд среды
+(dev → `https://setantatest.pythonanywhere.com`, preProd → `setantastaging`,
+master → `setanta`). Отката на прокси нет: пока origin фронта не попал в
+`CORS_ALLOWED_ORIGINS` бэкенда, на этой среде не работает ничего, включая
+вход. Поэтому переменную заводят только после того, как бэкенд пустил origin.
+Переменная подставляется при сборке — после её смены нужен передеплой.
 
 **На API переведены вход и рекламодатели.** Остальные разделы по-прежнему читают
 демо-данные из `localStorage` — см. раздел «CRUD» ниже.

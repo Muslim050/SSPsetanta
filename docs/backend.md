@@ -57,6 +57,15 @@ Origin: http://localhost:5173            → Access-Control-Allow-Origin: http:/
 **Нужно:** добавить в белый список `http://localhost:5178` и
 `https://setantadev.vercel.app`.
 
+**24.10:** `https://setantadev.vercel.app` пускают `setanta` и
+`setantatest`; `setantastaging` не пускает никого. Прод
+(`https://setanta-prod.vercel.app`), preProd
+(`https://setanta-preprod.vercel.app`) и `http://localhost:5178` по-прежнему
+без `Access-Control-Allow-Origin`. Это теперь и про скорость: запросы идут
+через прокси Vercel, и ролик на 66 МБ грузится 73 с вместо ~15 с. С
+`VITE_BASE_URL` фронт ходит на бэкенд напрямую, без отката на прокси, — без
+origin в списке бэкенда на этой среде не работает ничего, включая вход.
+
 ### Файлы
 
 #### 3.2 ~~Скачивание закрыто токеном~~
