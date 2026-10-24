@@ -1,11 +1,5 @@
-import { apiOrigin, request, type UploadProgress } from '../client'
+import { apiOrigin, request } from '../client'
 import type { StoredFile } from '../types'
-
-/** Отслеживание и отмена загрузки — для прогресса в интерфейсе. */
-export interface UploadOptions {
-  onProgress?: (progress: UploadProgress) => void
-  signal?: AbortSignal
-}
 
 /**
  * Загрузчик файлов. Сервер проверяет тип и размер по назначению: скан
@@ -14,20 +8,11 @@ export interface UploadOptions {
 export type FileKind = 'contract' | 'creative' | 'logo'
 
 /** POST /files — multipart. Дату загрузки проставляет сервер. */
-export function upload(
-  file: File,
-  kind: FileKind,
-  { onProgress, signal }: UploadOptions = {},
-): Promise<StoredFile> {
+export function upload(file: File, kind: FileKind): Promise<StoredFile> {
   const form = new FormData()
   form.append('file', file)
   form.append('kind', kind)
-  return request<StoredFile>('/files', {
-    method: 'POST',
-    body: form,
-    signal,
-    onUploadProgress: onProgress,
-  })
+  return request<StoredFile>('/files', { method: 'POST', body: form })
 }
 
 /** Ссылка нашего хранилища — в отличие от внешней, на чужой хост. */

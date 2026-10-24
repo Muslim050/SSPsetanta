@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as reportsApi from '@/api/endpoints/reports'
-import type { UploadOptions } from '@/api/endpoints/files'
 import { isApiError } from '@/api/errors'
 import type {
   ManualReportInput,
@@ -208,13 +207,11 @@ export function useImportReport() {
       contractId,
       period,
       file,
-      ...options
     }: {
       contractId: number
       period: ReportPeriod
       file: File
-    } & UploadOptions) =>
-      reportsApi.importFile(contractId, period, file, options),
+    }) => reportsApi.importFile(contractId, period, file),
     onSuccess: (report) => {
       client.setQueryData(
         reportKeys.report(report.contractId, report.period),
