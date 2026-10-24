@@ -1,7 +1,15 @@
 import { useEffect, useState } from 'react'
 import {
+  Archive,
+  Banknote,
   BarChart3,
+  CircleCheck,
+  Clock,
   Download,
+  Eye,
+  Inbox,
+  Play,
+  Send,
   CalendarDays,
   CalendarRange,
   ExternalLink,
@@ -36,43 +44,72 @@ import { downloadFile, fileHref } from '@/features/files/download'
 import { cn } from '@/lib/cn.js'
 import { advertiserLogo } from '@/features/advertisers/logo'
 
+// Оформление статусов кампании: цвет пилюли и иконка вместо точки — по
+// форме статус читается и без цвета. `icon` — цвет иконки на светлой
+// пилюле; у залитых (ждём оплату, оплачен) иконка берёт цвет текста.
 const STATUS_UI = {
   sent: {
+    Icon: Send,
     shell: 'border-sky-200 bg-sky-50/80 text-sky-700',
-    dot: 'bg-sky-500',
+    icon: 'text-sky-500',
     value: 'border-sky-200 bg-surface text-sky-700',
   },
   received: {
+    Icon: Inbox,
     shell: 'border-violet-200 bg-violet-50/80 text-violet-700',
-    dot: 'bg-violet-500',
+    icon: 'text-violet-500',
     value: 'border-violet-200 bg-surface text-violet-700',
   },
   reviewing: {
+    Icon: Eye,
     shell: 'border-yellow-200 bg-yellow-50 text-yellow-700',
-    dot: 'bg-yellow-400',
+    icon: 'text-yellow-500',
     value: 'border-yellow-200 bg-surface text-yellow-700',
   },
   active: {
+    Icon: Play,
     shell: 'border-emerald-200 bg-emerald-50/80 text-emerald-700',
-    dot: 'bg-emerald-500',
+    icon: 'text-emerald-500',
     value: 'border-emerald-200 bg-surface text-emerald-700',
   },
+  // Завершена — нормальный исход, не ошибка: нейтральный серый.
   completed: {
-    shell: 'border-red-200 bg-red-50 text-red-700',
-    dot: 'bg-red-500',
-    value: 'border-red-200 bg-surface text-red-700',
+    Icon: CircleCheck,
+    shell: 'border-line bg-ink/5 text-ink-soft',
+    icon: 'text-ink-muted',
+    value: 'border-line bg-surface text-ink-soft',
   },
   // Ждём оплату — заливка красная, текст светлый.
   awaiting_payment: {
+    Icon: Clock,
     shell: 'border-red-500 bg-red-500 text-red-50',
-    dot: 'bg-red-100',
+    icon: 'text-current',
     value: 'border-red-300/60 bg-red-400/40 text-red-50',
   },
   paid: {
+    Icon: Banknote,
     shell: 'border-emerald-500 bg-emerald-500 text-emerald-50',
-    dot: 'bg-emerald-100',
+    icon: 'text-current',
     value: 'border-emerald-300/60 bg-emerald-400/40 text-emerald-50',
   },
+  archived: {
+    Icon: Archive,
+    shell: 'border-line bg-ink/5 text-ink-soft',
+    icon: 'text-ink-muted',
+    value: 'border-line bg-surface text-ink-soft',
+  },
+}
+
+/** Иконка статуса кампании — та же, что в пилюле; для списков и меню. */
+export function CampaignStatusIcon({ status, size = 14, className }) {
+  const ui = STATUS_UI[status] || STATUS_UI.completed
+  return (
+    <ui.Icon
+      size={size}
+      aria-hidden="true"
+      className={cn('shrink-0', ui.icon, className)}
+    />
+  )
 }
 
 export function CampaignStatusPill({ status, pacing, createdAt }) {
@@ -93,24 +130,12 @@ export function CampaignStatusPill({ status, pacing, createdAt }) {
     <Tooltip label={sentAt} className="max-w-full">
       <span
         className={cn(
-          'inline-flex max-w-full items-center gap-2 rounded-xl border px-2.5 py-1.5 text-[12px] font-semibold',
+          'inline-flex max-w-full items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-[12px] font-semibold',
           ui.shell,
           awaiting && 'animate-pulse',
         )}
       >
-        <span className="relative flex h-2 w-2 shrink-0">
-          {awaiting && (
-            <span
-              className={cn(
-                'absolute inline-flex h-full w-full animate-ping rounded-full opacity-70',
-                ui.dot,
-              )}
-            />
-          )}
-          <span
-            className={cn('relative inline-flex h-2 w-2 rounded-full', ui.dot)}
-          />
-        </span>
+        <CampaignStatusIcon status={status} />
         <span className="truncate">{label}</span>
         {status === 'active' && (
           <span
@@ -149,6 +174,26 @@ function CreativeBody({ addedAt }) {
     </>
   )
 }
+
+/**
+ * Мок: ролики заявок, которые ещё не загрузили на сервер, — лежат в
+ * `public/creatives`. Только для показа в карточке: в форму и на сервер они
+ * не попадают. Адрес абсолютный от своего origin — иначе `fileHref` при
+ * `VITE_API_URL` отправил бы его на бэкенд. Свой ролик у заявки появился —
+ * мок больше не показывается.
+ */
+const MOCK_CREATIVES = {
+  // Artel, «Октябрь — Ноябрь 2026».
+  192: '/creatives/artel-192-15sec.mp4',
+}
+
+const mockCreative = (campaignId) =>
+  MOCK_CREATIVES[campaignId]
+    ? {
+        url: new URL(MOCK_CREATIVES[campaignId], window.location.origin).href,
+        addedAt: null,
+      }
+    : null
 
 /**
  * Плитка ролика — по клику видео открывается в новой вкладке. Ролик нашего
@@ -351,6 +396,7 @@ export function CampaignPreviewModal({
     (campaign?.creativeUrl
       ? { url: campaign.creativeUrl, addedAt: campaign.creativeAddedAt }
       : null) ??
+    mockCreative(campaign?.id) ??
     contract?.creative ??
     null
   const creativeUrl = creative?.url ?? ''

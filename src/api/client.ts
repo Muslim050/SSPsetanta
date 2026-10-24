@@ -54,6 +54,81 @@ export interface RequestOptions {
   signal?: AbortSignal
   /** Дополнительные заголовки, например `Idempotency-Key`. */
   headers?: Record<string, string>
+  /**
+   * Сколько тела уже ушло на сервер. С ним запрос идёт через XMLHttpRequest:
+   * у fetch прогресса отправки нет. Нужен загрузкам файлов.
+   */
+  onUploadProgress?: (progress: UploadProgress) => void
+}
+
+/** Прогресс отправки тела запроса, в байтах. */
+export interface UploadProgress {
+  loaded: number
+  total: number
+}
+
+/** Заголовки ответа XMLHttpRequest — строкой — в объект Headers. */
+function parseHeaders(raw: string): Headers {
+  const headers = new Headers()
+  for (const line of raw.trim().split(/[\r\n]+/)) {
+    const index = line.indexOf(':')
+    if (index > 0) {
+      headers.append(line.slice(0, index).trim(), line.slice(index + 1).trim())
+    }
+  }
+  return headers
+}
+
+/**
+ * Тот же запрос, что fetch, но через XMLHttpRequest — ради прогресса
+ * отправки. Ответ заворачиваем в Response, чтобы дальше он разбирался так же,
+ * как обычный: ошибки, обновление токена, JSON.
+ */
+function sendWithProgress(
+  url: string,
+  {
+    method,
+    headers,
+    body,
+    signal,
+    onUploadProgress,
+  }: {
+    method: string
+    headers: Record<string, string>
+    body: XMLHttpRequestBodyInit | undefined
+    signal?: AbortSignal
+    onUploadProgress: (progress: UploadProgress) => void
+  },
+): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException('Aborted', 'AbortError'))
+      return
+    }
+    const xhr = new XMLHttpRequest()
+    xhr.open(method, url)
+    xhr.responseType = 'blob'
+    for (const [key, value] of Object.entries(headers)) {
+      xhr.setRequestHeader(key, value)
+    }
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        onUploadProgress({ loaded: event.loaded, total: event.total })
+      }
+    }
+    xhr.onload = () =>
+      resolve(
+        new Response(xhr.status === 204 ? null : xhr.response, {
+          status: xhr.status,
+          statusText: xhr.statusText,
+          headers: parseHeaders(xhr.getAllResponseHeaders()),
+        }),
+      )
+    xhr.onerror = () => reject(new TypeError('Network request failed'))
+    xhr.onabort = () => reject(new DOMException('Aborted', 'AbortError'))
+    signal?.addEventListener('abort', () => xhr.abort(), { once: true })
+    xhr.send(body ?? null)
+  })
 }
 
 async function parseError(response: Response): Promise<ApiError> {
@@ -72,27 +147,31 @@ async function parseError(response: Response): Promise<ApiError> {
 
 async function send(
   path: string,
-  { method = 'GET', body, signal, headers }: RequestOptions,
+  { method = 'GET', body, signal, headers, onUploadProgress }: RequestOptions,
   withAuth: boolean,
 ): Promise<Response> {
   const access = withAuth ? getAccessToken() : null
   const isForm = body instanceof FormData
+  const url = `${BASE_URL}${API_PREFIX}${path}`
+  const init = {
+    method,
+    signal,
+    headers: {
+      // У multipart свой Content-Type с границей — его ставит браузер.
+      ...(body && !isForm ? { 'Content-Type': 'application/json' } : {}),
+      ...(access ? { Authorization: `Bearer ${access}` } : {}),
+      ...headers,
+    },
+    body: body
+      ? isForm
+        ? (body as FormData)
+        : JSON.stringify(body)
+      : undefined,
+  }
   try {
-    return await fetch(`${BASE_URL}${API_PREFIX}${path}`, {
-      method,
-      signal,
-      headers: {
-        // У multipart свой Content-Type с границей — его ставит браузер.
-        ...(body && !isForm ? { 'Content-Type': 'application/json' } : {}),
-        ...(access ? { Authorization: `Bearer ${access}` } : {}),
-        ...headers,
-      },
-      body: body
-        ? isForm
-          ? (body as FormData)
-          : JSON.stringify(body)
-        : undefined,
-    })
+    return onUploadProgress
+      ? await sendWithProgress(url, { ...init, onUploadProgress })
+      : await fetch(url, init)
   } catch (cause) {
     throw new NetworkError(cause)
   }
