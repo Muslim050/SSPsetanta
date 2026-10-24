@@ -31,10 +31,6 @@ import { Modal } from '@/components/ui/Modal.jsx'
 import { Loader } from '@/components/ui/Loader.jsx'
 import { formatDateTime } from '@/lib/format.js'
 import { cn } from '@/lib/cn.js'
-import {
-  isAborted,
-  useUploadProgress,
-} from '@/features/files/useUploadProgress'
 import { MONTHS_FULL } from './MonthTabs.jsx'
 import { CampaignTabs, useCampaignTabs } from './CampaignMediaTabs.jsx'
 import { ReportSheetTable } from './ReportSheetTable.jsx'
@@ -296,8 +292,6 @@ function ReportFileBar({ contractId, period, months, report, onImported }) {
   const [importError, setImportError] = useState(null)
   const [historyOpen, setHistoryOpen] = useState(false)
   const { mutate: importReport, isPending: importing } = useImportReport()
-  // Сколько файла уже ушло — в строке статуса, пока он загружается.
-  const importProgress = useUploadProgress()
   // Имя разбираемого файла — подпись под «проявляющимся» отчётом.
   const [pendingName, setPendingName] = useState('')
   const { mutate: exportReport, isPending: exporting } = useExportReport()
@@ -328,16 +322,13 @@ function ReportFileBar({ contractId, period, months, report, onImported }) {
     }
     setPendingName(file.name)
     importReport(
-      { contractId, period, file, ...importProgress.start() },
+      { contractId, period, file },
       {
         onSuccess: () => {
           toast.success(`Отчёт за ${month} загружен`)
           onImported?.()
         },
-        onSettled: importProgress.stop,
         onError: (error) => {
-          // Ушли со страницы посреди загрузки — она прервалась, это не ошибка.
-          if (isAborted(error)) return
           if (isApiError(error) && error.details.length) {
             setImportError(error)
             return
@@ -382,9 +373,7 @@ function ReportFileBar({ contractId, period, months, report, onImported }) {
 
   // Ошибка списка месяцев — это не «файла нет»: сервер просто не ответил.
   const status = importing
-    ? importProgress.sent
-      ? `Файл «${pendingName}» отправлен — разбираем, отчёт появится ниже`
-      : `Загружаем файл «${pendingName}» — ${importProgress.percent} % · ${importProgress.caption}`
+    ? `Загружаем файл «${pendingName}» — отчёт появится ниже`
     : deleting
       ? `Удаляем отчёт за ${month}…`
       : months.isError
