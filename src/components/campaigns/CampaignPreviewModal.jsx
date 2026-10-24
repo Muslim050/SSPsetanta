@@ -151,6 +151,26 @@ function CreativeBody({ addedAt }) {
 }
 
 /**
+ * Мок: ролики заявок, которые ещё не загрузили на сервер, — лежат в
+ * `public/creatives`. Только для показа в карточке: в форму и на сервер они
+ * не попадают. Адрес абсолютный от своего origin — иначе `fileHref` при
+ * `VITE_API_URL` отправил бы его на бэкенд. Свой ролик у заявки появился —
+ * мок больше не показывается.
+ */
+const MOCK_CREATIVES = {
+  // Artel, «Октябрь — Ноябрь 2026».
+  192: '/creatives/artel-192-15sec.mp4',
+}
+
+const mockCreative = (campaignId) =>
+  MOCK_CREATIVES[campaignId]
+    ? {
+        url: new URL(MOCK_CREATIVES[campaignId], window.location.origin).href,
+        addedAt: null,
+      }
+    : null
+
+/**
  * Плитка ролика — по клику видео открывается в новой вкладке. Ролик нашего
  * хранилища и ролик по внешней ссылке открываются одинаково: файл отдаётся
  * по слагу без авторизации.
@@ -351,6 +371,7 @@ export function CampaignPreviewModal({
     (campaign?.creativeUrl
       ? { url: campaign.creativeUrl, addedAt: campaign.creativeAddedAt }
       : null) ??
+    mockCreative(campaign?.id) ??
     contract?.creative ??
     null
   const creativeUrl = creative?.url ?? ''
