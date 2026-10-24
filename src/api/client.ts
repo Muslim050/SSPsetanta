@@ -3,15 +3,16 @@ import { getAccessToken, getRefreshToken, setTokens } from './token'
 import type { RefreshResponse, TokenPair } from './types'
 
 /**
- * Адрес бэкенда. По умолчанию пуст — запросы идут на собственный origin,
- * откуда их переправляет прокси: в разработке это server.proxy из
- * vite.config.js, на Vercel — Routing rules проекта. Так сделано
- * потому, что бэкенд не отдаёт CORS-заголовки.
+ * Адрес бэкенда — VITE_BASE_URL: все запросы идут на него напрямую, и
+ * бэкенд должен пускать origin фронта (CORS). Прокси Vercel гонит тело
+ * через свой узел — из Ташкента через Гонконг в США — и ролик на 66 МБ
+ * шёл через него 73 с против ~15 с напрямую.
  *
- * VITE_API_URL позволяет обратиться к серверу напрямую — это заработает,
- * когда на нём настроят CORS.
+ * Пусто — запросы идут на собственный origin, откуда их переправляет
+ * прокси: в разработке это server.proxy из vite.config.js, на Vercel —
+ * Routing rules проекта.
  */
-const BASE_URL = import.meta.env.VITE_API_URL ?? ''
+const BASE_URL = (import.meta.env.VITE_BASE_URL ?? '').replace(/\/+$/, '')
 const API_PREFIX = '/api/v1'
 
 /**
@@ -20,7 +21,7 @@ const API_PREFIX = '/api/v1'
  * отдать серверу абсолютной: `creativeUrl` у кампании — обычное URL-поле.
  */
 export function apiOrigin(): string {
-  if (BASE_URL) return BASE_URL.replace(/\/+$/, '')
+  if (BASE_URL) return BASE_URL
   return typeof window === 'undefined' ? '' : window.location.origin
 }
 
