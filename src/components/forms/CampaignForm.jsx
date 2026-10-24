@@ -21,6 +21,7 @@ import { FilePicker } from '@/components/ui/FilePicker.jsx'
 import { DatePicker } from '@/components/ui/DatePicker.jsx'
 import { absoluteUrl } from '@/api/endpoints/files'
 import { Logo } from '@/components/Logo'
+import { CampaignStatusIcon } from '@/components/campaigns/CampaignPreviewModal.jsx'
 import { PACKAGES, STATUS, leagueLabel, statusLabel } from '@/lib/metrics.js'
 import { formatDate } from '@/lib/format.js'
 import { cn } from '@/lib/cn.js'
@@ -518,8 +519,13 @@ export function CampaignForm({ open, onClose, initial, defaultAdvertiserId }) {
                       ([k]) => !HIDDEN_STATUS.includes(k) || k === form.status,
                     )
                     .map(([k, v]) => (
+                      // Иконка — та же, что в пилюле статуса в таблице; она
+                      // же видна в поле у выбранного статуса.
                       <SelectItem key={k} value={k}>
-                        {v.label}
+                        <span className="flex items-center gap-2">
+                          <CampaignStatusIcon status={k} />
+                          {v.label}
+                        </span>
                       </SelectItem>
                     ))}
                 </SelectContent>
