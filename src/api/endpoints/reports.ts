@@ -1,6 +1,5 @@
 import { request, requestFile } from '../client'
 import { buildQuery } from '../query'
-import type { UploadOptions } from './files'
 import type {
   ManualReportInput,
   Paginated,
@@ -60,15 +59,12 @@ export function importFile(
   contractId: number,
   period: ReportPeriod,
   file: File,
-  { onProgress, signal }: UploadOptions = {},
 ): Promise<Report> {
   const form = new FormData()
   form.append('file', file)
   return request<Report>(`${base(contractId)}/${period}/import`, {
     method: 'POST',
     body: form,
-    signal,
-    onUploadProgress: onProgress,
   })
 }
 

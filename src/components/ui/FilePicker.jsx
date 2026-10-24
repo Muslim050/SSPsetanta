@@ -3,12 +3,7 @@ import { Download, FileText, Loader2, Paperclip, X } from 'lucide-react'
 import { cn } from '@/lib/cn.js'
 import { formatDateTime } from '@/lib/format.js'
 import { useToast } from '@/components/ui/Toast.jsx'
-import { Progress } from '@/components/ui/Progress.jsx'
 import { useUploadFile } from '@/features/files/queries'
-import {
-  isAborted,
-  useUploadProgress,
-} from '@/features/files/useUploadProgress'
 import { downloadFile, openFile } from '@/features/files/download'
 
 /**
@@ -44,15 +39,13 @@ export function FilePicker({
   const inputRef = useRef(null)
   const toast = useToast()
   const { mutate: uploadFile, isPending: uploading } = useUploadFile()
-  // Проценты, скорость и отмена — ролики весят десятки мегабайт.
-  const progress = useUploadProgress()
   // Файл тащат над полем — подсвечиваем, что его тут ждут.
   const [dragging, setDragging] = useState(false)
 
   const send = (picked) => {
     if (!picked || uploading || disabled) return
     uploadFile(
-      { file: picked, kind, ...progress.start() },
+      { file: picked, kind },
       {
         onSuccess: (stored) =>
           onPick({
@@ -62,10 +55,7 @@ export function FilePicker({
             addedAt: stored.addedAt,
           }),
         onError: (error) =>
-          isAborted(error)
-            ? toast.info('Загрузка отменена')
-            : toast.error(error.message || 'Не удалось загрузить файл'),
-        onSettled: progress.stop,
+          toast.error(error.message || 'Не удалось загрузить файл'),
       },
     )
   }
@@ -144,24 +134,9 @@ export function FilePicker({
             <Paperclip size={16} className="shrink-0 text-ink-muted" />
           )}
           <span className="min-w-0 flex-1 truncate">
-            {uploading
-              ? progress.sent
-                ? 'Сохраняем…'
-                : `Загружаем… ${progress.percent} %`
-              : name || emptyLabel}
+            {uploading ? 'Загружаем…' : name || emptyLabel}
           </span>
         </button>
-        {uploading && !progress.sent && (
-          <button
-            type="button"
-            aria-label="Отменить загрузку"
-            title="Отменить загрузку"
-            onClick={progress.cancel}
-            className="shrink-0 rounded-lg p-1 text-ink-muted transition-colors hover:bg-ink/6 hover:text-danger focus-ring"
-          >
-            <X size={14} />
-          </button>
-        )}
         {name && downloadable && !downloadLabel && (
           <button
             type="button"
@@ -173,7 +148,7 @@ export function FilePicker({
             <Download size={14} />
           </button>
         )}
-        {name && !disabled && !uploading && (
+        {name && !disabled && (
           <button
             type="button"
             aria-label="Убрать файл"
@@ -186,16 +161,8 @@ export function FilePicker({
         )}
       </div>
 
-      {/* Идёт загрузка: полоса и «12 из 60 МБ · 2,1 МБ/с · ещё 23 с». */}
-      {uploading && (
-        <div role="status" aria-live="polite" className="space-y-1">
-          <Progress value={progress.sent ? 100 : progress.percent} />
-          <p className="text-[11px] text-ink-muted tnum">{progress.caption}</p>
-        </div>
-      )}
-
       {/* Когда файл загрузили — видно всем, кто открывает карточку. */}
-      {!uploading && name && addedAt && (
+      {name && addedAt && (
         <p className="text-[11px] text-ink-muted tnum">
           Добавлен {formatDateTime(addedAt)}
         </p>
