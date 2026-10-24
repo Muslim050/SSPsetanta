@@ -32,54 +32,30 @@
 
 Закрытые пункты зачёркнуты и сжаты до строки с подтверждением — нумерация
 сохранена, на неё ссылаются соседние документы и комментарии в коде.
-Открытыми остались 3.1, 3.9, 3.12, 3.14, 3.18, 3.19, пять пунктов про файлы —
-3.20–3.23, они всплыли, когда фронт переходил на загрузку файлов, и 3.28 про
-медленную загрузку роликов, — и два про отчёт за месяц: 3.24 и 3.25.
+Открытыми остались 3.1, 3.9, 3.12, 3.14, 3.18, 3.19, четыре пункта про файлы —
+3.20–3.23, они всплыли, когда фронт переходил на загрузку файлов, — и два
+про отчёт за месяц: 3.24 и 3.25.
 
 ### Блокирующее
 
-#### 3.1 CORS: фронт не может ходить на бэк напрямую
+#### 3.1 CORS: в белом списке чужой порт
 
-Фронт хочет ходить на бэк напрямую, без прокси Vercel: прокси — лишний узел,
-на загрузке роликов он стоит заметного времени (см. 3.28). Переключение на
-фронте — одна переменная `VITE_API_URL`, но без CORS упадёт каждый запрос.
-
-Preflight `OPTIONS` с `Authorization` (24.10):
+Заголовки появились, но пускают не нас. Preflight с нашими origin'ами
+(22.09):
 
 ```
-                                   prod (setanta.)   стейджинг (setantastaging.)
-https://setanta-prod.vercel.app    нет               нет
-https://setantadev.vercel.app      есть              нет
-http://localhost:5178              нет               нет
-http://localhost:5173              есть              есть
+Origin: http://localhost:5178            → Access-Control-Allow-Origin нет
+Origin: https://setantadev.vercel.app    → Access-Control-Allow-Origin нет
+Origin: http://localhost:5173            → Access-Control-Allow-Origin: http://localhost:5173
 ```
 
-На проде для `setantadev` уже отдаётся
-`Access-Control-Allow-Headers: accept, authorization, content-type,
-user-agent, x-csrftoken, x-requested-with` и
-`Access-Control-Expose-Headers: Content-Disposition` — этого почти хватает.
+`5173` — дефолтный порт Vite, наш дев поднимается на **5178**
+(`vite.config.js`). Пока список такой, фронт по-прежнему ходит через прокси
+(`server.proxy` в разработке, `rewrites` на Vercel), и любой сторонний клиент
+упрётся в то же самое.
 
-**Нужно** — на проде и на стейджинге:
-
-1. В белый список origin'ов: `https://setanta-prod.vercel.app`,
-   `https://setantadev.vercel.app`, `http://localhost:5178`.
-2. В `Access-Control-Allow-Headers` добавить `idempotency-key` — с ним уходит
-   `POST /contracts/:id/payments`, без него браузер не пропустит запрос.
-3. Оставить `Access-Control-Expose-Headers: Content-Disposition` — из него
-   фронт берёт имя файла при выгрузке отчёта в `.xlsx`.
-
-Проверка:
-
-```bash
-curl -si -X OPTIONS https://setanta.pythonanywhere.com/api/v1/contracts/1/payments \
-  -H "Origin: https://setanta-prod.vercel.app" \
-  -H "Access-Control-Request-Method: POST" \
-  -H "Access-Control-Request-Headers: authorization,content-type,idempotency-key" \
-  | grep -i access-control
-```
-
-В ответе должны быть `allow-origin` с нашим доменом и `idempotency-key` в
-`allow-headers`.
+**Нужно:** добавить в белый список `http://localhost:5178` и
+`https://setantadev.vercel.app`.
 
 ### Файлы
 
@@ -238,17 +214,6 @@ GET /campaigns/153 → creativeUrl: "http://localhost:5178/api/v1/files/…"
 `DELETE /files/:id` в схеме нет. Файл, который отвязали от сущности
 (`logoId: null`, `creativeId: null`), остаётся в хранилище навсегда. Не
 срочно, но со временем это мусор — особенно на роликах.
-
-#### 3.28 Ролики грузятся минутами
-
-Ролик в 60 МБ уходит одним `POST /files` через прокси Vercel на
-PythonAnywhere: минуты ожидания, обрыв связи — загрузка с нуля. Фронт файл не
-обрабатывает, ускорить без бэка нечем.
-
-**Нужно:** загрузка напрямую в объектное хранилище (R2 или S3) частями по
-подписанным ссылкам — `POST /files/uploads`, `…/complete`, отмена; ответ
-`complete` — тот же `StoredFile`, `POST /files` остаётся для мелких файлов.
-Подробно — [upload-direct.md](upload-direct.md).
 
 ### Отчёт за месяц
 
