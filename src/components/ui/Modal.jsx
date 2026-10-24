@@ -25,6 +25,8 @@ export function Modal({
   logo,
   children,
   footer,
+  // Слой поверх всего окна — например, ход загрузки на время сохранения.
+  overlay,
   size = 'md',
 }) {
   const logoSrc = fileHref(typeof logo === 'string' ? logo : null)
@@ -137,6 +139,12 @@ export function Modal({
         {footer && (
           <div className="flex items-center justify-end gap-2 border-t border-line bg-paper/50 px-6 py-4">
             {footer}
+          </div>
+        )}
+
+        {overlay && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-surface/90 p-6 backdrop-blur-[2px]">
+            {overlay}
           </div>
         )}
       </motion.div>
