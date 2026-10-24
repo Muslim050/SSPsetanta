@@ -1,0 +1,51 @@
+# Каждый push в dev вливается в preProd — руками PR dev → preProd больше не
+# нужен. Vercel видит push в preProd и сам пересобирает setanta-preprod.
+# В master по-прежнему только через PR: это проверка перед продом.
+#
+# Получилось перемотать preProd вперёд — перематываем, иначе merge-коммит.
+# Конфликт — запуск падает, preProd остаётся как был; слить руками.
+
+name: Sync dev → preProd
+
+on:
+  push:
+    branches: [dev]
+  # Ручной запуск из вкладки Actions — например, после разбора конфликта.
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Два push подряд — второй ждёт первого, а не сливает параллельно.
+concurrency:
+  group: sync-preprod
+  cancel-in-progress: false
+
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: preProd
+          fetch-depth: 0
+
+      - name: Merge dev into preProd
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin dev
+
+          if git merge-base --is-ancestor origin/dev HEAD; then
+            echo "preProd уже содержит dev — сливать нечего."
+            exit 0
+          fi
+
+          if ! git merge --no-edit origin/dev \
+            -m "Merge dev into preProd ($(git rev-parse --short origin/dev))"; then
+            git merge --abort
+            echo "::error::Конфликт при слиянии dev в preProd — слейте руками (PR dev → preProd)."
+            exit 1
+          fi
+
+          git push origin HEAD:preProd
