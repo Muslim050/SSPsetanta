@@ -19,6 +19,9 @@ import { downloadFile, openFile } from '@/features/files/download'
  * onPick получает `{ id, name, url, addedAt }` либо null, если файл убрали.
  * `id` — то, что уходит в сущность (`fileId`, `creativeId`, `logoId`),
  * `addedAt` проставляет сервер.
+ *
+ * С `deferred` файл на сервер не уходит: onPick получает `{ file, name }`,
+ * а загружает его форма при сохранении.
  */
 export function FilePicker({
   name,
@@ -38,6 +41,8 @@ export function FilePicker({
   action = 'download',
   /** Поле только для чтения: файл пришёл из другой сущности. */
   disabled = false,
+  /** Не загружать сразу — файл остаётся в браузере до сохранения формы. */
+  deferred = false,
   icon: Icon = FileText,
   className,
 }) {
@@ -51,6 +56,10 @@ export function FilePicker({
 
   const send = (picked) => {
     if (!picked || uploading || disabled) return
+    if (deferred) {
+      onPick({ file: picked, name: picked.name, url: null, addedAt: null })
+      return
+    }
     uploadFile(
       { file: picked, kind, ...progress.start() },
       {

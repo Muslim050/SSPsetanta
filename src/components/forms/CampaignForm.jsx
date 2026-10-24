@@ -1,10 +1,16 @@
 import { useEffect, useState } from 'react'
-import { Download, FileText, Film } from 'lucide-react'
+import { Download, FileText, Film, Loader2 } from 'lucide-react'
 // Кампании переехали на сервер. Мок остаётся для разделов, которые ещё
 // не подключены: import { useData } from '@/context/DataContext.jsx'
 import { useVisibleAdvertisers } from '@/features/advertisers/queries'
 import { useSaveCampaign } from '@/features/campaigns/queries'
 import { downloadFile } from '@/features/files/download'
+import { useUploadFile } from '@/features/files/queries'
+import {
+  formatBytes,
+  isAborted,
+  useUploadProgress,
+} from '@/features/files/useUploadProgress'
 import { useAuth } from '@/features/auth/useAuth'
 import { useToast } from '@/components/ui/Toast.jsx'
 import { Modal } from '@/components/ui/Modal.jsx'
@@ -18,6 +24,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { FilePicker } from '@/components/ui/FilePicker.jsx'
+import { Progress } from '@/components/ui/Progress.jsx'
 import { DatePicker } from '@/components/ui/DatePicker.jsx'
 import { absoluteUrl } from '@/api/endpoints/files'
 import { Logo } from '@/components/Logo'
@@ -41,7 +48,8 @@ const emptyForm = {
   endDate: '',
   // Ролик приходит из выбранной рекламной кампании — дефолта нет.
   // Внутри — `{ id?, name, url, addedAt }`: id есть у своего файла,
-  // у ролика договора его нет, такой уходит ссылкой.
+  // у ролика договора его нет, такой уходит ссылкой. Только что выбранный
+  // ролик — `{ file, name }`: он ещё в браузере, загрузится при сохранении.
   creative: null,
   contractNumber: '',
   // Бренд заявки — выбирает только площадка на создании.
@@ -92,6 +100,52 @@ const creativeInput = (creative) => {
   }
 }
 
+/**
+ * Ход сохранения поверх формы: сначала уходит ролик — с процентами,
+ * скоростью и отменой, — затем сама кампания.
+ */
+function SaveOverlay({ stage, progress, onCancel }) {
+  const uploading = stage === 'upload'
+  // Файл ушёл целиком — сервер ещё сохраняет его, отменять уже поздно.
+  const cancelable = uploading && !progress.sent
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="w-full max-w-sm space-y-4 text-center"
+    >
+      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-900">
+        {cancelable ? (
+          <Film size={22} />
+        ) : (
+          <Loader2 size={22} className="animate-spin" />
+        )}
+      </div>
+      <div>
+        <p className="font-display text-base font-semibold text-ink tnum">
+          {!uploading
+            ? 'Сохраняем кампанию…'
+            : progress.sent
+              ? 'Сохраняем ролик…'
+              : `Загружаем ролик… ${progress.percent} %`}
+        </p>
+        <p className="mt-1 text-[12px] text-ink-muted tnum">
+          {uploading
+            ? progress.caption
+            : 'Ролик загружен — записываем кампанию'}
+        </p>
+      </div>
+      {uploading && <Progress value={progress.sent ? 100 : progress.percent} />}
+      {cancelable && (
+        <Button variant="secondary" size="sm" onClick={onCancel}>
+          Отменить загрузку
+        </Button>
+      )}
+    </div>
+  )
+}
+
 /** Срок договора одной строкой: «01.01.2026 — 31.12.2026». */
 const contractTerm = (contract) =>
   [contract?.start, contract?.end].filter(Boolean).map(formatDate).join(' — ')
@@ -115,6 +169,12 @@ const formFrom = (campaign) => ({
  */
 export function CampaignForm({ open, onClose, initial, defaultAdvertiserId }) {
   const { mutate: saveCampaign, isPending } = useSaveCampaign()
+  const { mutateAsync: uploadFile } = useUploadFile()
+  // Ролики весят десятки мегабайт — на время загрузки показываем ход.
+  const progress = useUploadProgress()
+  // Этап сохранения с роликом: `upload` — уходит файл, `save` — кампания.
+  // Пока он идёт, форму не закрыть случайным кликом мимо окна.
+  const [stage, setStage] = useState(null)
   const { data: advertisers = [] } = useVisibleAdvertisers()
   const { user, isAdmin, isAdvertiser } = useAuth()
   const toast = useToast()
@@ -187,13 +247,50 @@ export function CampaignForm({ open, onClose, initial, defaultAdvertiserId }) {
     setForm((f) => ({ ...f, name, ...(creative ? { creative } : null) }))
   }
 
-  /** Выбрали или убрали ролик. Загрузчик отдаёт `{ id, name, url, addedAt }`. */
+  /** Выбрали или убрали ролик. Поле отдаёт `{ file, name }` — без загрузки. */
   const pickCreative = (file) => {
     setForm((f) => ({ ...f, creative: file }))
     setErrors((e) => ({ ...e, creative: undefined }))
   }
 
-  const submit = () => {
+  /**
+   * Загружает выбранный в форме ролик и отдаёт его в виде загрузчика —
+   * `{ id, name, url, addedAt }`. null — загрузку отменили или она упала.
+   */
+  const uploadCreative = async (file) => {
+    setStage('upload')
+    try {
+      const stored = await uploadFile({
+        file,
+        kind: 'creative',
+        ...progress.start(),
+      })
+      const uploaded = {
+        id: stored.id,
+        name: stored.name,
+        url: stored.url,
+        addedAt: stored.addedAt,
+      }
+      // Запоминаем загруженный: не сохранится кампания — повтор не погонит
+      // файл заново.
+      setForm((f) => ({ ...f, creative: uploaded }))
+      return uploaded
+    } catch (error) {
+      setStage(null)
+      if (isAborted(error)) {
+        toast.info('Загрузка отменена')
+      } else {
+        const message = error.message || 'Не удалось загрузить ролик'
+        setErrors((e) => ({ ...e, creative: message }))
+        toast.error(message)
+      }
+      return null
+    } finally {
+      progress.stop()
+    }
+  }
+
+  const submit = async () => {
     const err = {}
     if (pickBrand && !form.advertiserId)
       err.advertiserId = 'Выберите рекламодателя'
@@ -209,6 +306,14 @@ export function CampaignForm({ open, onClose, initial, defaultAdvertiserId }) {
     setErrors(err)
     if (Object.keys(err).length) return
 
+    // Ролик, выбранный в форме, ещё в браузере — сначала загружаем его.
+    let saved = creative
+    if (creative?.file) {
+      saved = await uploadCreative(creative.file)
+      if (!saved) return
+      setStage('save')
+    }
+
     const campaign = {
       name: form.name.trim(),
       objective: form.objective,
@@ -217,7 +322,7 @@ export function CampaignForm({ open, onClose, initial, defaultAdvertiserId }) {
       // Условия договора сервер проставляет сам по его номеру: пакет, лиги,
       // юр. лицо, срок и дату оплаты отправлять не нужно.
       contractNumber: form.contractNumber.trim(),
-      ...creativeInput(creative),
+      ...creativeInput(saved),
     }
     // Статус ведёт площадка, и только у существующей заявки: новую сервер
     // заводит сам — «Отправлен» у рекламодателя, «Получен» у площадки.
@@ -252,14 +357,26 @@ export function CampaignForm({ open, onClose, initial, defaultAdvertiserId }) {
           }
           toast.error(err2.message || 'Не удалось сохранить кампанию')
         },
+        onSettled: () => setStage(null),
       },
     )
   }
 
+  const busy = stage !== null
+
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={busy ? undefined : onClose}
+      overlay={
+        busy && (
+          <SaveOverlay
+            stage={stage}
+            progress={progress}
+            onCancel={progress.cancel}
+          />
+        )
+      }
       logo={<Logo size={40} withWord={false} />}
       title={editing ? 'Редактировать кампанию' : 'Новая кампания'}
       description={
@@ -273,7 +390,11 @@ export function CampaignForm({ open, onClose, initial, defaultAdvertiserId }) {
           <Button variant="ghost" onClick={onClose}>
             Отмена
           </Button>
-          <Button variant="primary" onClick={submit} disabled={isPending}>
+          <Button
+            variant="primary"
+            onClick={submit}
+            disabled={isPending || busy}
+          >
             {isPending
               ? 'Сохраняем…'
               : editing
@@ -454,10 +575,13 @@ export function CampaignForm({ open, onClose, initial, defaultAdvertiserId }) {
             hint={
               creativeLocked
                 ? 'Ролик приходит из выбранного договора'
-                : 'Выберите ролик или перетащите файл'
+                : creative?.file
+                  ? `${formatBytes(creative.file.size)} · загрузится при сохранении`
+                  : 'Выберите ролик или перетащите файл'
             }
           >
             <FilePicker
+              deferred
               kind="creative"
               name={creative?.name}
               url={creative?.url}
