@@ -14,7 +14,7 @@ export interface FileLink {
  * содержимым приходилось ходить транспортом и показывать его блобом.
  *
  * Ссылка загрузчика относительная — до сервера её доводит прокси. Когда
- * фронт ходит к API напрямую (`VITE_API_URL`), origin добавляет `absoluteUrl`.
+ * фронт ходит к API напрямую (`VITE_BASE_URL`), origin добавляет `absoluteUrl`.
  */
 export function fileHref(url: string | null | undefined): string | undefined {
   return url ? absoluteUrl(url) : undefined
