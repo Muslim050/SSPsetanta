@@ -288,7 +288,7 @@ export function useSetPaymentStatus() {
   })
 }
 
-/** Правка поступления — в интерфейсе меняется только его дата. */
+/** Правка поступления: дата и сумма. Освоенное сервер пересчитывает сам. */
 export function useUpdatePayment() {
   const client = useQueryClient()
 
