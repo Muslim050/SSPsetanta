@@ -346,14 +346,15 @@ export default function Campaigns() {
 
   const currentYear = new Date().getFullYear()
   const allYears = yearsOf(contractCampaigns, currentYear)
-  const termYears = allYears.filter(
-    (y) =>
-      (!contractStart || y >= contractStart.year) &&
-      (!contractEnd || y <= contractEnd.year),
+  // Годы — весь срок договора подряд, а не только те, где уже есть
+  // кампании: договор до 2027 года иначе листался бы до последней кампании.
+  // Открытую сторону срока доводим до лет кампаний и текущего.
+  const lastYear = contractEnd?.year ?? allYears[allYears.length - 1]
+  const firstYear = Math.min(contractStart?.year ?? allYears[0], lastYear)
+  const years = Array.from(
+    { length: lastYear - firstYear + 1 },
+    (_, i) => firstYear + i,
   )
-  const years = termYears.length
-    ? termYears
-    : [(contractEnd ?? contractStart).year]
   // Год мог пропасть вместе со сменой бренда или договора.
   const activeYear = years.includes(year)
     ? year

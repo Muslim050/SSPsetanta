@@ -64,8 +64,8 @@ const arrowClass =
   'flex h-7 w-7 items-center justify-center rounded-lg text-ink-muted transition-colors focus-ring enabled:hover:bg-ink/6 enabled:hover:text-ink-soft disabled:opacity-35'
 
 /**
- * Выбор года стрелками среди `years` — слева во вкладках месяцев и рядом с
- * периодом на страницах «Статистика».
+ * Выбор года стрелками среди `years` — рядом с периодом на страницах
+ * «Статистика» и в календаре месяцев договора.
  */
 export function YearSwitcher({ year, years, onChange, className }) {
   const index = years.indexOf(year)
@@ -105,7 +105,40 @@ export function YearSwitcher({ year, years, onChange, className }) {
 }
 
 /**
- * Фильтр периода: слева выбор года стрелками, справа 12 месяцев.
+ * Годы строкой над месяцами: все сразу на виду, выбранный подчёркнут.
+ * Стрелки прятали, что у договора есть следующий год, — его надо было
+ * угадать.
+ */
+function YearRow({ year, years, onChange }) {
+  return (
+    <div
+      role="tablist"
+      aria-label="Годы"
+      className="flex items-center gap-4 px-1.5"
+    >
+      {years.map((item) => (
+        <button
+          key={item}
+          type="button"
+          role="tab"
+          aria-selected={item === year}
+          onClick={() => onChange(item)}
+          className={cn(
+            'border-b-2 pb-0.5 text-[13px] tnum transition-colors focus-ring',
+            item === year
+              ? 'border-indigo-500 font-semibold text-ink'
+              : 'border-transparent font-medium text-ink-muted hover:text-ink',
+          )}
+        >
+          {item}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * Фильтр периода: над месяцами — годы строкой (YearRow), ниже 12 месяцев.
  * Отдельной вкладки «Все» нет: фильтр снимает крестик справа (или повторный
  * клик по выбранному месяцу).
  * years: доступные годы, counts: сколько кампаний попадает в каждый месяц,
@@ -141,68 +174,71 @@ export function MonthTabs({
   const atDefault = year === currentYear && value === currentMonth
 
   return (
-    <div className={cn('flex  items-center gap-2', className)}>
-      <YearSwitcher year={year} years={years} onChange={onYearChange} />
+    // Крестик — по нижнему краю, вровень с месяцами, а не с годами над ними.
+    <div className={cn('flex items-end gap-2', className)}>
+      <div className="flex min-w-0 flex-col items-start gap-1.5">
+        <YearRow year={year} years={years} onChange={onYearChange} />
 
-      <div
-        role="tablist"
-        aria-label="Месяцы"
-        className="no-scrollbar inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-xl border border-line bg-surface p-[4.5px]"
-      >
-        {MONTHS_SHORT.map((label, month) => {
-          const at = year * 12 + month
-          if (
-            (since && at < since.year * 12 + since.month) ||
-            (until && at > until.year * 12 + until.month) ||
-            hidden.includes(`${year}-${String(month + 1).padStart(2, '0')}`)
-          ) {
-            return null
-          }
-          const active = value === month
-          const count = counts?.[month] ?? 0
-          const status = statuses?.[month] ?? null
-          // Прошедшие и текущий месяц — цветные, будущие — серые.
-          const passed =
-            year < currentYear ||
-            (year === currentYear && month <= currentMonth)
-          return (
-            <button
-              key={label}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              disabled={!passed}
-              title={
-                passed
-                  ? cn(
-                      `${MONTHS_FULL[month]} ${year}`,
-                      status && `· ${statusTitles[status]}`,
-                    )
-                  : `${MONTHS_FULL[month]} ${year} — месяц ещё не наступил`
-              }
-              onClick={() => onChange(active ? null : month)}
-              className={cn(
-                'flex shrink-0 items-center gap-1 rounded-lg px-2 py-1.5 text-[13px] font-medium transition-all focus-ring',
-                passed
-                  ? status
-                    ? (statusFills?.[status] ?? STATUS_FILLS[status])
-                    : cn(
-                        MONTH_FILLS[month],
-                        'text-indigo-900 hover:brightness-[0.97]',
+        <div
+          role="tablist"
+          aria-label="Месяцы"
+          className="no-scrollbar inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-xl border border-line bg-surface p-[4.5px]"
+        >
+          {MONTHS_SHORT.map((label, month) => {
+            const at = year * 12 + month
+            if (
+              (since && at < since.year * 12 + since.month) ||
+              (until && at > until.year * 12 + until.month) ||
+              hidden.includes(`${year}-${String(month + 1).padStart(2, '0')}`)
+            ) {
+              return null
+            }
+            const active = value === month
+            const count = counts?.[month] ?? 0
+            const status = statuses?.[month] ?? null
+            // Прошедшие и текущий месяц — цветные, будущие — серые.
+            const passed =
+              year < currentYear ||
+              (year === currentYear && month <= currentMonth)
+            return (
+              <button
+                key={label}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                disabled={!passed}
+                title={
+                  passed
+                    ? cn(
+                        `${MONTHS_FULL[month]} ${year}`,
+                        status && `· ${statusTitles[status]}`,
                       )
-                  : FUTURE_FILL,
-                active && 'font-semibold ring-2 ring-indigo-700',
-              )}
-            >
-              {label}
-              {passed && count > 0 && (
-                <span className="rounded-full bg-black/[0.07] px-1 text-[11px] tnum">
-                  {count}
-                </span>
-              )}
-            </button>
-          )
-        })}
+                    : `${MONTHS_FULL[month]} ${year} — месяц ещё не наступил`
+                }
+                onClick={() => onChange(active ? null : month)}
+                className={cn(
+                  'flex shrink-0 items-center gap-1 rounded-lg px-2 py-1.5 text-[13px] font-medium transition-all focus-ring',
+                  passed
+                    ? status
+                      ? (statusFills?.[status] ?? STATUS_FILLS[status])
+                      : cn(
+                          MONTH_FILLS[month],
+                          'text-indigo-900 hover:brightness-[0.97]',
+                        )
+                    : FUTURE_FILL,
+                  active && 'font-semibold ring-2 ring-indigo-700',
+                )}
+              >
+                {label}
+                {passed && count > 0 && (
+                  <span className="rounded-full bg-black/[0.07] px-1 text-[11px] tnum">
+                    {count}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {/* Крестик появляется, только когда ушли от того, что страница
