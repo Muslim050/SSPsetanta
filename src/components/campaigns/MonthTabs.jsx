@@ -115,6 +115,8 @@ export function YearSwitcher({ year, years, onChange, className }) {
  * resetLabel: что делает крестик — страницы трактуют сброс по-разному.
  * since, until: первый и последний месяц `{ year, month }` (month — с нуля),
  * например срок договора: месяцы вне них не показываем. null — без границы.
+ * hidden: месяцы `YYYY-MM`, которых тоже не показываем, — скрытые в
+ * договоре (`hiddenMonths`).
  */
 export function MonthTabs({
   year,
@@ -129,6 +131,7 @@ export function MonthTabs({
   resetLabel = 'Показать все месяцы',
   since = null,
   until = null,
+  hidden = [],
   className,
 }) {
   const now = new Date()
@@ -150,7 +153,8 @@ export function MonthTabs({
           const at = year * 12 + month
           if (
             (since && at < since.year * 12 + since.month) ||
-            (until && at > until.year * 12 + until.month)
+            (until && at > until.year * 12 + until.month) ||
+            hidden.includes(`${year}-${String(month + 1).padStart(2, '0')}`)
           ) {
             return null
           }

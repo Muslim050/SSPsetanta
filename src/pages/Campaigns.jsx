@@ -340,6 +340,9 @@ export default function Campaigns() {
   // Показываем только месяцы срока договора — и годы только его.
   const contractStart = monthOfDate(selectedContract?.start)
   const contractEnd = monthOfDate(selectedContract?.end)
+  // Месяцы, скрытые в договоре (серые в его календаре), — как и на «Статусе
+  // оплаты», здесь их нет.
+  const hiddenMonths = selectedContract?.hiddenMonths ?? []
 
   const currentYear = new Date().getFullYear()
   const allYears = yearsOf(contractCampaigns, currentYear)
@@ -368,7 +371,9 @@ export default function Campaigns() {
     showMonths &&
     month != null &&
     isPassedMonth(activeYear, month) &&
-    !isOutsideTerm(contractStart, contractEnd, activeYear, month)
+    !isOutsideTerm(contractStart, contractEnd, activeYear, month) &&
+    // Скрытый месяц не открывается и по ссылке с `?month=`.
+    !hiddenMonths.includes(periodKey(activeYear, month))
       ? month
       : null
   // Внутри выбранного месяца переключаемся между отчётом и списком кампаний.
@@ -871,6 +876,7 @@ export default function Campaigns() {
             statuses={monthStatuses}
             since={contractStart}
             until={contractEnd}
+            hidden={hiddenMonths}
           />
         </div>
       )}
