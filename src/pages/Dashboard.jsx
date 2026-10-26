@@ -28,7 +28,11 @@ import {
   audienceProblem,
   audienceToInput,
 } from '@/features/reports/viewsStatistics'
-import { PeriodStatistics } from '@/components/campaigns/PeriodStatistics.jsx'
+import {
+  PeriodPicker,
+  STATISTICS_TITLE,
+} from '@/components/campaigns/PeriodStatistics.jsx'
+import { TotalStatisticsReport } from '@/components/campaigns/CampaignReportPanels.jsx'
 import { AdvertiserPicker } from '@/components/campaigns/AdvertiserPicker.jsx'
 import { SegmentTabs } from '@/components/ui/Tabs.jsx'
 import { useToast } from '@/components/ui/Toast.jsx'
@@ -828,8 +832,8 @@ export default function Dashboard() {
     : `За ${monthLabel} не введено`
 
   // Разделы обзора разведены по вкладкам: цифр много, на одной странице
-  // они не читаются.
-  const [tab, setTab] = useState('media')
+  // они не читаются. Первой — общая статистика.
+  const [tab, setTab] = useState('total')
 
   // Разделы аудитории на входе в правку: не меняли — на сервер не шлём, иначе
   // правка одного YouTube записала бы месяцу нули вместо «не введено».
@@ -927,47 +931,58 @@ export default function Dashboard() {
               </Button>
             </>
           ) : (
-            <Button
-              variant="primary"
-              onClick={startEditing}
-              // Правка — за один месяц и с его данными: без них не с чего.
-              disabled={!period || !audience}
-              title={period ? undefined : 'Править можно один месяц'}
-            >
-              <Pencil size={16} />
-              Редактировать
-            </Button>
+            // Общая статистика не правится — кнопка только у разделов.
+            tab !== 'total' && (
+              <Button
+                variant="primary"
+                onClick={startEditing}
+                // Правка — за один месяц и с его данными: без них не с чего.
+                disabled={!period || !audience}
+                title={period ? undefined : 'Править можно один месяц'}
+              >
+                <Pencil size={16} />
+                Редактировать
+              </Button>
+            )
           ))}
       </PageHeader>
 
-      <PeriodStatistics
-        period={range}
-        // Устройства и города — в разделах аудитории ниже, в шапке не
-        // повторяем.
-        summary={header.summary && { ...header.summary, device: null, geo: [] }}
-        loading={header.loading}
-        error={header.error}
-        filter={
-          <AdvertiserPicker
-            advertisers={advertisers}
-            value={advertiserId}
-            onChange={setAdvertiserId}
-          />
-        }
-      />
-
-      <div className="mb-4 mt-6">
+      {/* Вкладки и период — одной строкой: период общий для всех вкладок,
+          поэтому рядом с ними, а не в карточке общей статистики. На узком
+          экране период переносится под вкладки. */}
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
         <SegmentTabs
           items={[
+            { value: 'total', label: 'Общая статистика' },
             { value: 'media', label: 'Медиа и аудитория' },
             { value: 'youtube', label: 'YouTube аналитика' },
           ]}
           value={tab}
           onChange={setTab}
         />
+        <PeriodPicker period={range} />
       </div>
 
-      {!period ? (
+      {tab === 'total' ? (
+        <TotalStatisticsReport
+          title={STATISTICS_TITLE}
+          // Устройства и города — на вкладке «Медиа и аудитория», здесь не
+          // повторяем.
+          summary={
+            header.summary && { ...header.summary, device: null, geo: [] }
+          }
+          loading={header.loading}
+          error={header.error}
+          emptyNote="За выбранный период данных нет."
+          headerExtra={
+            <AdvertiserPicker
+              advertisers={advertisers}
+              value={advertiserId}
+              onChange={setAdvertiserId}
+            />
+          }
+        />
+      ) : !period ? (
         <NotEntered text="Возраст, устройства, лиги, города и YouTube ведутся по месяцам — выберите период в один месяц." />
       ) : tab === 'media' ? (
         <>
