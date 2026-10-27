@@ -18,6 +18,7 @@ import ContractList from '@/pages/ContractList.jsx'
 import Channels from '@/pages/Channels.jsx'
 import Reports from '@/pages/Reports.jsx'
 import NotFound from '@/pages/NotFound.jsx'
+import Watch from '@/pages/Watch.jsx'
 
 /** Стартовый экран обеих ролей. */
 const HOME = '/app/campaigns' as const
@@ -180,6 +181,35 @@ const reportsRoute = createRoute({
   component: Reports,
 })
 
+/**
+ * Ролик на всю вкладку: `?src=<адрес файла>&name=<имя>`. Без входа — файл
+ * и так отдаётся по слагу без авторизации. Адрес берём только http(s).
+ */
+export interface WatchSearch {
+  src?: string
+  name?: string
+}
+
+const httpUrl = (value: unknown) => {
+  if (typeof value !== 'string') return undefined
+  try {
+    const { protocol } = new URL(value)
+    return protocol === 'http:' || protocol === 'https:' ? value : undefined
+  } catch {
+    return undefined
+  }
+}
+
+const watchRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/watch',
+  validateSearch: (search: Record<string, unknown>): WatchSearch => ({
+    src: httpUrl(search.src),
+    name: text(search.name),
+  }),
+  component: Watch,
+})
+
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
@@ -191,6 +221,7 @@ const indexRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
+  watchRoute,
   appRoute.addChildren([
     appIndexRoute,
     campaignsRoute,
