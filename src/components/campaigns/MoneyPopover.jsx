@@ -43,13 +43,46 @@ const toDateTimeInput = (date) => {
 const rowButton =
   'shrink-0 rounded-lg p-1 text-ink-muted transition-colors focus-ring disabled:opacity-50'
 
+const inputClass =
+  'rounded-lg border border-line bg-surface px-2 py-1 text-ink transition-colors focus-ring focus-visible:border-indigo-300'
+
+// Поступление показываем с копейками — сервер хранит их (decimal, до 2 знаков).
+const paymentMoney = new Intl.NumberFormat('ru-RU', {
+  maximumFractionDigits: 2,
+})
+
+/** Сумма поступления для поля: «59126163.30» → «59 126 163,3». */
+const decimalField = (value) => {
+  const [whole, fraction = ''] = String(value ?? '').split('.')
+  const cents = fraction.replace(/0+$/, '')
+  const grouped = groupDigits(whole)
+  return cents ? `${grouped || '0'},${cents}` : grouped
+}
+
+/** Ввод суммы: разряды пробелами, одна запятая и до двух знаков после неё. */
+const typeDecimal = (raw) => {
+  const [whole, ...rest] = String(raw).replace(/\./g, ',').split(',')
+  const grouped = groupDigits(whole)
+  if (!rest.length) return grouped
+  return `${grouped || '0'},${onlyDigits(rest.join('')).slice(0, 2)}`
+}
+
+/** Поле → decimal-строка для API: «59 126 163,3» → «59126163.3». */
+const toDecimal = (field) => {
+  const [whole, fraction = ''] = field.split(',')
+  const digits = onlyDigits(whole).replace(/^0+(?=\d)/, '') || '0'
+  const cents = onlyDigits(fraction).replace(/0+$/, '')
+  return cents ? `${digits}.${cents}` : digits
+}
+
 /**
- * Строка истории выплат. Площадка правит в ней дату и сумму поступления —
- * обе разом, по «Сохранить», — и удаляет его. `label` — подпись под датой,
- * например бренд и договор в общей истории по всем договорам.
+ * Строка истории выплат. Площадка правит в ней поступление — дату, сумму
+ * с копейками и комментарий разом, по «Сохранить», — и удаляет его.
+ * `label` — подпись под датой, например бренд и договор в общей истории
+ * по всем договорам.
  *
- * onSave получает только изменённые поля `{ paidAt?, amount? }` и отдаёт
- * true, если сервер их принял. onRemove — удалить поступление.
+ * onSave получает тело PATCH целиком — `{ amount, paidAt, comment }` — и
+ * отдаёт true, если сервер его принял. onRemove — удалить поступление.
  */
 export function PaymentRow({
   index,
@@ -64,28 +97,43 @@ export function PaymentRow({
   const [saving, setSaving] = useState(false)
   const [paidAt, setPaidAt] = useState('')
   const [amount, setAmount] = useState('')
+  const [comment, setComment] = useState('')
 
-  const initialPaidAt = toDateTimeInput(new Date(paidAtOf(payment)))
-  const initialAmount = Math.round(Number(payment.amount) || 0)
-  const value = Number(onlyDigits(amount)) || 0
-  const valid = !!paidAt && value > 0
+  const savedPaidAt = paidAtOf(payment)
+  const initialPaidAt = toDateTimeInput(new Date(savedPaidAt))
+  const savedAmount = toDecimal(decimalField(payment.amount))
+  const savedComment = payment.comment ?? ''
+  const nextAmount = toDecimal(amount)
+  const valid = !!paidAt && Number(nextAmount) > 0
 
   const start = () => {
     setPaidAt(initialPaidAt)
-    setAmount(amountField(payment.amount))
+    setAmount(decimalField(payment.amount))
+    setComment(savedComment)
     setEditing(true)
   }
 
   const save = async () => {
     if (!valid || saving) return
-    // Только изменённое: сумму с копейками иначе молча округлили бы до рубля.
-    const input = {}
-    if (paidAt !== initialPaidAt) input.paidAt = new Date(paidAt).toISOString()
-    if (value !== initialAmount) input.amount = String(value)
-    if (!Object.keys(input).length) return setEditing(false)
+    const nextComment = comment.trim()
+    // Ничего не поменяли — на сервер не ходим.
+    if (
+      paidAt === initialPaidAt &&
+      nextAmount === savedAmount &&
+      nextComment === savedComment
+    ) {
+      return setEditing(false)
+    }
 
     setSaving(true)
-    const ok = await onSave(input)
+    const ok = await onSave({
+      amount: nextAmount,
+      // Поле даты — с точностью до минуты: не трогали его — отправляем дату
+      // как есть, иначе секунды поступления обнулились бы молча.
+      paidAt:
+        paidAt === initialPaidAt ? savedPaidAt : new Date(paidAt).toISOString(),
+      comment: nextComment,
+    })
     setSaving(false)
     // Ошибка — остаёмся в правке, введённое не теряется.
     if (ok) setEditing(false)
@@ -109,56 +157,73 @@ export function PaymentRow({
       <div
         onKeyDown={onKeyDown}
         className={cn(
-          'flex items-center gap-1.5 rounded-xl bg-paper/70 px-2 py-1.5',
+          'space-y-1.5 rounded-xl bg-paper/70 px-2 py-1.5',
           className,
         )}
       >
-        <span className="w-4 shrink-0 text-[10px] text-ink-muted tnum">
-          {index + 1}
-        </span>
-        <input
-          type="datetime-local"
-          value={paidAt}
-          onChange={(e) => setPaidAt(e.target.value)}
-          aria-label="Дата и время выплаты"
-          className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-2 py-1 text-[11px] text-ink transition-colors tnum focus-ring focus-visible:border-indigo-300"
-        />
-        <input
-          inputMode="numeric"
-          autoFocus
-          value={amount}
-          onChange={(e) => setAmount(groupDigits(e.target.value))}
-          aria-label="Сумма выплаты"
-          placeholder="0"
-          className="w-[104px] shrink-0 rounded-lg border border-line bg-surface px-2 py-1 text-right text-[12px] font-semibold text-ink transition-colors tnum focus-ring focus-visible:border-indigo-300"
-        />
-        <button
-          type="button"
-          onClick={save}
-          disabled={!valid || saving}
-          aria-label="Сохранить поступление"
-          title="Сохранить"
-          className={cn(
-            rowButton,
-            'hover:bg-emerald-50 hover:text-emerald-700',
-          )}
-        >
-          {saving ? (
-            <Loader2 size={14} className="animate-spin" />
-          ) : (
-            <Check size={14} />
-          )}
-        </button>
-        <button
-          type="button"
-          onClick={() => setEditing(false)}
-          disabled={saving}
-          aria-label="Отменить правку"
-          title="Отменить"
-          className={cn(rowButton, 'hover:bg-ink/6 hover:text-ink')}
-        >
-          <X size={14} />
-        </button>
+        <div className="flex items-center gap-1.5">
+          <span className="w-4 shrink-0 text-[10px] text-ink-muted tnum">
+            {index + 1}
+          </span>
+          <input
+            type="datetime-local"
+            value={paidAt}
+            onChange={(e) => setPaidAt(e.target.value)}
+            aria-label="Дата и время выплаты"
+            className={cn(inputClass, 'min-w-0 flex-1 text-[11px] tnum')}
+          />
+          <input
+            inputMode="decimal"
+            autoFocus
+            value={amount}
+            onChange={(e) => setAmount(typeDecimal(e.target.value))}
+            aria-label="Сумма выплаты"
+            placeholder="0"
+            className={cn(
+              inputClass,
+              'w-[112px] shrink-0 text-right text-[12px] font-semibold tnum',
+            )}
+          />
+          <button
+            type="button"
+            onClick={save}
+            disabled={!valid || saving}
+            aria-label="Сохранить поступление"
+            title="Сохранить"
+            className={cn(
+              rowButton,
+              'hover:bg-emerald-50 hover:text-emerald-700',
+            )}
+          >
+            {saving ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Check size={14} />
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => setEditing(false)}
+            disabled={saving}
+            aria-label="Отменить правку"
+            title="Отменить"
+            className={cn(rowButton, 'hover:bg-ink/6 hover:text-ink')}
+          >
+            <X size={14} />
+          </button>
+        </div>
+        {/* Пустая ячейка под номером: комментарий встаёт вровень с датой
+            и кончается там же, где кнопки строки над ним. */}
+        <div className="flex items-center gap-1.5">
+          <span className="w-4 shrink-0" />
+          <input
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            aria-label="Комментарий к выплате"
+            placeholder="Комментарий"
+            className={cn(inputClass, 'min-w-0 flex-1 text-[11px]')}
+          />
+        </div>
       </div>
     )
   }
@@ -175,19 +240,27 @@ export function PaymentRow({
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-[12px] text-ink-muted tnum">
-          {formatDateTime(paidAtOf(payment))}
+          {formatDateTime(savedPaidAt)}
         </p>
         {label && <p className="truncate text-[11px] text-ink-soft">{label}</p>}
+        {savedComment && (
+          <p
+            className="truncate text-[11px] text-ink-muted"
+            title={savedComment}
+          >
+            {savedComment}
+          </p>
+        )}
       </div>
       <span className="shrink-0 text-[13px] font-semibold text-emerald-700 tnum">
-        + {formatMoney(payment.amount)}
+        + {paymentMoney.format(Number(payment.amount) || 0)}
       </span>
       {editable && onSave && (
         <button
           type="button"
           onClick={start}
           aria-label="Изменить поступление"
-          title="Изменить дату и сумму"
+          title="Изменить дату, сумму и комментарий"
           className={cn(rowButton, 'hover:bg-ink/6 hover:text-indigo-800')}
         >
           <Pencil size={14} />
@@ -213,7 +286,7 @@ export function PaymentRow({
  * Правка сумм договора: сумма договора, оплачено и разовое поступление,
  * которое прибавляется к оплаченному. Вторая вкладка — история выплат
  * с датой и временем каждого платежа: в ней поступление правят
- * (`onEditPayment(id, { paidAt?, amount? })` → true, если сохранено)
+ * (`onEditPayment(id, { amount, paidAt, comment })` → true, если сохранено)
  * и удаляют (`onRemovePayment(payment)`).
  * Рисуется порталом с position: fixed — иначе таблица его обрежет.
  */

@@ -196,7 +196,7 @@
 
 Поступления вносит только admin — в поповере у карточки «Бюджет / Прибыль» договора
 (`src/components/campaigns/MoneyPopover.jsx`). Там же вкладка «История выплат»: список
-доступен всем ролям на чтение, дату и время каждой записи admin может поправить.
+доступен всем ролям на чтение, дату со временем и сумму каждой записи admin может поправить.
 `spent` договора должен быть суммой поступлений — считать на сервере.
 
 **Важно:** в историю попадает **любой прирост оплаченного**, а не только поле «Поступление».
@@ -368,7 +368,7 @@ PATCH  /campaigns/:id                  (admin)
 PATCH  /contracts/:id/amounts            (admin) { budget?, spent? }
 GET    /contracts/:id/payments            история выплат, все роли
 POST   /contracts/:id/payments           (admin) { amount, paidAt }
-PATCH  /contracts/:id/payments/:payId    (admin) { paidAt }
+PATCH  /contracts/:id/payments/:payId    (admin) { paidAt?, amount?, comment? }
 DELETE /contracts/:id/payments/:payId    (admin) удаляет поступление, `spent` уменьшается
 GET    /contracts/:id/status-log          история смен статуса, все роли
 PUT    /contracts/:id/payment-status      (admin) { status, period, changedAt }
