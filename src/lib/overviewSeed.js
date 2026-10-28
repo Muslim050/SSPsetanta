@@ -126,7 +126,7 @@ export const OVERVIEW_DEFAULTS = {
   ],
   deviceShare: [
     { id: 'dev_browser', label: 'Браузер', value: 3, color: '#68A9DC' },
-    { id: 'dev_tv', label: 'Smart TV', value: 66, color: '#EE9B5A' },
+    { id: 'dev_tv', label: 'Смарт ТВ', value: 66, color: '#EE9B5A' },
     { id: 'dev_phone', label: 'Телефон', value: 30, color: '#A7ADB4' },
     { id: 'dev_tablet', label: 'Планшет', value: 1, color: '#EFCB55' },
   ],
@@ -136,16 +136,16 @@ export const OVERVIEW_DEFAULTS = {
       platform: 'OTT',
       data: [
         { id: 'ott_phone', label: 'Телефон', value: 65, color: '#68A9DC' },
-        { id: 'ott_tv', label: 'Smart TV', value: 22, color: '#EFCB55' },
+        { id: 'ott_tv', label: 'Смарт ТВ', value: 22, color: '#EFCB55' },
         { id: 'ott_browser', label: 'Браузер', value: 10, color: '#A7ADB4' },
         { id: 'ott_tablet', label: 'Планшет', value: 3, color: '#EE9B5A' },
       ],
     },
     {
       id: 'pf_tv',
-      platform: 'TV',
+      platform: 'ТВ',
       data: [
-        { id: 'tv_tv', label: 'Smart TV', value: 54, color: '#EFCB55' },
+        { id: 'tv_tv', label: 'Смарт ТВ', value: 54, color: '#EFCB55' },
         { id: 'tv_phone', label: 'Телефон', value: 33, color: '#68A9DC' },
         { id: 'tv_browser', label: 'Браузер', value: 12, color: '#A7ADB4' },
         { id: 'tv_tablet', label: 'Планшет', value: 1, color: '#EE9B5A' },
@@ -155,37 +155,37 @@ export const OVERVIEW_DEFAULTS = {
   leagueAgeRows: [
     {
       id: 'lg_football',
-      sport: 'Football',
+      sport: 'Футбол',
       leagues: 'EPL, LaLiga, Ligue 1, Bundesliga, Serie A',
       ages: [27.8, 33.3, 22.2, 16.7],
     },
     {
       id: 'lg_mma',
-      sport: 'MMA Fights',
+      sport: 'Бои ММА',
       leagues: 'UFC, Bellator, PFL',
       ages: [37.9, 34.5, 16.5, 11.1],
     },
     {
       id: 'lg_racing',
-      sport: 'Racing',
+      sport: 'Автогонки',
       leagues: 'F1',
       ages: [15.6, 31.9, 27.9, 24.6],
     },
     {
       id: 'lg_tennis',
-      sport: 'Tennis',
+      sport: 'Теннис',
       leagues: 'WTA, ATP',
       ages: [17.0, 31.2, 28.2, 23.6],
     },
     {
       id: 'lg_basketball',
-      sport: 'Basketball',
+      sport: 'Баскетбол',
       leagues: 'NBA',
       ages: [35.3, 28.8, 24.7, 11.2],
     },
     {
       id: 'lg_hockey',
-      sport: 'Hockey',
+      sport: 'Хоккей',
       leagues: 'NHL',
       ages: [15.8, 25.5, 32.5, 26.2],
     },

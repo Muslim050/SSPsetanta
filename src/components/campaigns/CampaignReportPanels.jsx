@@ -78,14 +78,14 @@ const SOCIAL_CHANNELS = [
 // нет, на карточках прочерк.
 const TOTAL_METRICS = [
   // Выходы рекламы в прямых эфирах SS1 + SS2.
-  { key: 'liveCount', label: 'Прямые эфиры', icon: RadioTower },
+  { key: 'liveCount', label: 'Live Spot', icon: RadioTower },
   { key: 'standardCount', label: 'Standard Spot', icon: Clapperboard },
-  { key: 'eventPromoCount', label: 'Промо в эфире', icon: Tv },
-  { key: 'totalSeconds', label: 'Хронометраж, сек.', icon: Timer },
+  { key: 'eventPromoCount', label: 'Event Promo', icon: Tv },
+  { key: 'totalSeconds', label: 'Duration, sec.', icon: Timer },
   // Наблюдателю просмотры не показываем — как и в таблице размещений.
   {
     key: 'liveViews',
-    label: 'Просмотры Live Ads',
+    label: 'Live Ads View',
     icon: PlayCircle,
     viewer: false,
   },
@@ -96,7 +96,7 @@ const TOTAL_METRICS = [
 // Устройства в порядке карточки: ключ `device` из итогов → подпись и цвет.
 const DEVICES = [
   { key: 'browser', label: 'Браузер', color: '#4A9BDF' },
-  { key: 'tv', label: 'Smart TV', color: '#F47B20' },
+  { key: 'tv', label: 'Смарт ТВ', color: '#F47B20' },
   { key: 'phone', label: 'Телефон', color: '#A3A3A3' },
   { key: 'tablet', label: 'Планшет', color: '#FFD106' },
 ]
