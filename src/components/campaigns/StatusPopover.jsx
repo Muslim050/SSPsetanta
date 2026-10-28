@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, ChevronLeft, ChevronRight, Loader2, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import { Field, Input } from '@/components/ui/Field'
+import { DateTimePicker } from '@/components/ui/DateTimePicker.jsx'
+import { Field } from '@/components/ui/Field'
 import {
   MONTHS_SHORT,
   MONTHS_FULL,
@@ -16,7 +17,7 @@ const WIDTH = 300
 
 const pad = (n) => String(n).padStart(2, '0')
 
-/** Дата со временем для input[type=datetime-local] — в местной зоне. */
+/** Дата со временем для DateTimePicker — в местной зоне. */
 const toDateTimeInput = (date) =>
   `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
     date.getDate(),
@@ -303,11 +304,10 @@ export function StatusPopover({
           {!monthOnly && (
             <div className="mt-3">
               <Field label="Дата изменения">
-                <Input
-                  type="datetime-local"
+                <DateTimePicker
                   value={changedAt}
-                  onChange={(e) => pickChangedAt(e.target.value)}
-                  className="h-9 text-[13px] tnum"
+                  onChange={pickChangedAt}
+                  className="h-9 text-[13px]"
                 />
               </Field>
             </div>

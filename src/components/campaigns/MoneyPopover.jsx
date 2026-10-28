@@ -9,6 +9,7 @@ import {
   paidAtOf,
 } from '@/lib/format.js'
 import { Button } from '@/components/ui/Button'
+import { DateTimePicker } from '@/components/ui/DateTimePicker.jsx'
 import { Field, Input } from '@/components/ui/Field'
 import { cn } from '@/lib/cn.js'
 import { usePopoverPlacement } from '@/lib/usePopoverPlacement.js'
@@ -32,7 +33,7 @@ const amountField = (value) => {
   return rounded ? groupDigits(String(rounded)) : ''
 }
 
-/** Дата со временем для input[type=datetime-local] — в местной зоне. */
+/** Дата со временем для DateTimePicker — в местной зоне. */
 const toDateTimeInput = (date) => {
   const pad = (n) => String(n).padStart(2, '0')
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
@@ -165,12 +166,11 @@ export function PaymentRow({
           <span className="w-4 shrink-0 text-[10px] text-ink-muted tnum">
             {index + 1}
           </span>
-          <input
-            type="datetime-local"
+          <DateTimePicker
             value={paidAt}
-            onChange={(e) => setPaidAt(e.target.value)}
+            onChange={setPaidAt}
             aria-label="Дата и время выплаты"
-            className={cn(inputClass, 'min-w-0 flex-1 text-[11px] tnum')}
+            className="h-[26px] min-w-0 flex-1 rounded-lg px-2 text-[11px] [&>svg]:size-3.5"
           />
           <input
             inputMode="decimal"
@@ -521,11 +521,10 @@ export function MoneyPopover({
             </Field>
 
             <Field label="Дата поступления">
-              <Input
-                type="datetime-local"
+              <DateTimePicker
                 value={paidAt}
-                onChange={(e) => setPaidAt(e.target.value)}
-                className="h-9 text-[13px] tnum"
+                onChange={setPaidAt}
+                className="h-9 text-[13px]"
               />
             </Field>
           </div>
