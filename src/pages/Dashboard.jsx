@@ -28,9 +28,14 @@ import {
   audienceProblem,
   audienceToInput,
 } from '@/features/reports/viewsStatistics'
-import { PeriodStatistics } from '@/components/campaigns/PeriodStatistics.jsx'
+import {
+  PeriodPicker,
+  STATISTICS_TITLE,
+} from '@/components/campaigns/PeriodStatistics.jsx'
+import { TotalStatisticsReport } from '@/components/campaigns/CampaignReportPanels.jsx'
 import { AdvertiserPicker } from '@/components/campaigns/AdvertiserPicker.jsx'
 import { SegmentTabs } from '@/components/ui/Tabs.jsx'
+import { MonthTabs } from '@/components/campaigns/MonthTabs.jsx'
 import { useToast } from '@/components/ui/Toast.jsx'
 import { useConfirm } from '@/components/ui/Confirm.jsx'
 import { formatNumber, formatShare } from '@/lib/format.js'
@@ -163,7 +168,7 @@ function RemoveRow({ label, onClick }) {
 // Колонки возраста в таблице лиг — в порядке AGE_KEYS, без 13–17
 // (значение группы остаётся в row.ages и уходит на сервер как было).
 const AGE_COLUMNS = AGE_KEYS.flatMap((key, index) =>
-  key === '13-17' ? [] : [{ index, label: `${key.replace('-', '–')} y.o.` }],
+  key === '13-17' ? [] : [{ index, label: key.replace('-', '–') }],
 )
 
 function AudienceAgeReport({ data, editing, patch, emptyText }) {
@@ -226,7 +231,7 @@ function AudienceAgeReport({ data, editing, patch, emptyText }) {
           <div className="flex items-start justify-between gap-4 border-b border-line bg-paper/45 p-5">
             <div>
               <h3 className="font-display text-lg font-semibold text-ink">
-                Устройства: OTT и TV
+                Устройства: OTT и ТВ
               </h3>
               <p className="mt-1 text-[13px] text-ink-muted">
                 Доля просмотров по типам экранов в каждой среде.
@@ -297,8 +302,8 @@ function AudienceAgeReport({ data, editing, patch, emptyText }) {
           <table className="w-full min-w-[820px] text-sm">
             <thead className="bg-ink text-white">
               <tr className="text-[11px] font-semibold uppercase tracking-wider">
-                <th className="px-5 py-3 text-left">Sport</th>
-                <th className="px-5 py-3 text-left">League</th>
+                <th className="px-5 py-3 text-left">Спорт</th>
+                <th className="px-5 py-3 text-left">Лиги</th>
                 {AGE_COLUMNS.map(({ label }) => (
                   <th key={label} className="px-4 py-3 text-center">
                     {label}
@@ -794,42 +799,48 @@ export default function Dashboard() {
   // Правки копим в черновике: «Отмена» возвращает сохранённые данные.
   const [draft, setDraft] = useState(null)
 
-  // Период — как у рекламодателя: год и «от и до». Сменили его —
-  // черновик прошлого периода за собой не тащим.
+  // Разделы обзора разведены по вкладкам: цифр много, на одной странице
+  // они не читаются. Первой — общая статистика.
+  const [tab, setTab] = useState('total')
+
+  // Общая статистика — за период «от и до», как у рекламодателя. Аудитория
+  // и YouTube ведутся помесячно, у них свой выбор одного месяца (месяц в
+  // нём всегда один: пользуемся только pickMonth и pickYear). Сменили
+  // период — черновик прошлого за собой не тащим.
   const range = useMonthRange({ onChange: () => setDraft(null) })
-  // Аудитория и YouTube ведутся помесячно: они есть, только когда период —
-  // ровно один месяц.
-  const period = range.month != null ? periodOf(range.year, range.month) : null
-  const overview = overviewFor(period ?? range.to)
-  const monthLabel = range.label
+  const single = useMonthRange({ onChange: () => setDraft(null) })
+  const period = periodOf(single.year, single.month)
+  const overview = overviewFor(period)
+  const monthLabel = tab === 'total' ? range.label : single.label
   // Рекламодатель для итогов в шапке; пусто — все.
   const { data: advertisers = [] } = useAdvertisers()
   const [advertiserId, setAdvertiserId] = useState('')
-  // Статистика за период — с сервера одним запросом (см. usePeriodTotals):
-  // итоги в шапке и, когда месяц один, разделы аудитории.
+  // Итоги общей статистики за период — с сервера одним запросом (см.
+  // usePeriodTotals).
   const header = usePeriodTotals({
     from: range.from,
     to: range.to,
     advertiserId: advertiserId ? Number(advertiserId) : null,
   })
+  // Разделы аудитории — доли выбранного месяца, одни на все договоры: от
+  // выбора рекламодателя не зависят.
+  const monthly = usePeriodTotals({
+    from: period,
+    to: period,
+    advertiserId: null,
+  })
 
-  // Разделы аудитории — доли месяца из того же ответа (одни на все договоры,
-  // от выбора рекламодателя не зависят). YouTube пока живёт демо-данными в
-  // браузере.
+  // YouTube пока живёт демо-данными в браузере.
   const { mutate: saveViews, isPending: savingViews } = useSaveViewsStatistics()
   const audience = useMemo(
-    () => (period && header.stats ? audienceFromServer(header.stats) : null),
-    [period, header.stats],
+    () => (monthly.stats ? audienceFromServer(monthly.stats) : null),
+    [monthly.stats],
   )
-  const viewsLoading = header.loading
+  const viewsLoading = monthly.loading
   const canEditPage = canEdit && !isAdvertiser
   const emptyText = canEditPage
     ? 'Не введено — нажмите «Редактировать»'
     : `За ${monthLabel} не введено`
-
-  // Разделы обзора разведены по вкладкам: цифр много, на одной странице
-  // они не читаются.
-  const [tab, setTab] = useState('media')
 
   // Разделы аудитории на входе в правку: не меняли — на сервер не шлём, иначе
   // правка одного YouTube записала бы месяцу нули вместо «не введено».
@@ -927,48 +938,69 @@ export default function Dashboard() {
               </Button>
             </>
           ) : (
-            <Button
-              variant="primary"
-              onClick={startEditing}
-              // Правка — за один месяц и с его данными: без них не с чего.
-              disabled={!period || !audience}
-              title={period ? undefined : 'Править можно один месяц'}
-            >
-              <Pencil size={16} />
-              Редактировать
-            </Button>
+            // Общая статистика не правится — кнопка только у разделов.
+            tab !== 'total' && (
+              <Button
+                variant="primary"
+                onClick={startEditing}
+                // Правка — с данными месяца: без них не с чего.
+                disabled={!audience}
+              >
+                <Pencil size={16} />
+                Редактировать
+              </Button>
+            )
           ))}
       </PageHeader>
 
-      <PeriodStatistics
-        period={range}
-        // Устройства и города — в разделах аудитории ниже, в шапке не
-        // повторяем.
-        summary={header.summary && { ...header.summary, device: null, geo: [] }}
-        loading={header.loading}
-        error={header.error}
-        filter={
-          <AdvertiserPicker
-            advertisers={advertisers}
-            value={advertiserId}
-            onChange={setAdvertiserId}
-          />
-        }
-      />
-
-      <div className="mb-4 mt-6">
+      {/* Вкладки и период — одной строкой: у общей статистики период «от
+          и до», у помесячных разделов — лента месяцев. На узком экране
+          период переносится под вкладки. */}
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
         <SegmentTabs
           items={[
+            { value: 'total', label: 'Общая статистика' },
             { value: 'media', label: 'Медиа и аудитория' },
             { value: 'youtube', label: 'YouTube аналитика' },
           ]}
           value={tab}
           onChange={setTab}
         />
+        {tab === 'total' ? (
+          <PeriodPicker period={range} />
+        ) : (
+          <MonthTabs
+            year={single.year}
+            years={single.years}
+            onYearChange={single.pickYear}
+            value={single.month}
+            onChange={single.pickMonth}
+            // Месяц обязателен, поэтому сброс возвращает к текущему.
+            resetLabel="Вернуться к текущему месяцу"
+            yearArrows
+          />
+        )}
       </div>
 
-      {!period ? (
-        <NotEntered text="Возраст, устройства, лиги, города и YouTube ведутся по месяцам — выберите период в один месяц." />
+      {tab === 'total' ? (
+        <TotalStatisticsReport
+          title={STATISTICS_TITLE}
+          // Устройства и города — на вкладке «Медиа и аудитория», здесь не
+          // повторяем.
+          summary={
+            header.summary && { ...header.summary, device: null, geo: [] }
+          }
+          loading={header.loading}
+          error={header.error}
+          emptyNote="За выбранный период данных нет."
+          headerExtra={
+            <AdvertiserPicker
+              advertisers={advertisers}
+              value={advertiserId}
+              onChange={setAdvertiserId}
+            />
+          }
+        />
       ) : tab === 'media' ? (
         <>
           {viewsLoading ? (
@@ -977,7 +1009,7 @@ export default function Dashboard() {
               label={`Загружаем статистику за ${monthLabel}…`}
               className="min-h-0 py-8 sm:min-h-0"
             />
-          ) : header.error ? (
+          ) : monthly.error ? (
             <NotEntered
               text="Не удалось загрузить статистику просмотров — обновите страницу."
               className="mt-6"

@@ -149,32 +149,6 @@ export function CampaignStatusPill({ status, pacing, createdAt }) {
   )
 }
 
-/** Внутренности плитки ролика — одни и те же у ссылки и у кнопки. */
-function CreativeBody({ addedAt }) {
-  return (
-    <>
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-[11px] font-medium uppercase tracking-wider text-ink-muted">
-          Ролик
-        </span>
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-100 text-indigo-900 transition-transform group-hover:scale-105">
-          <Film size={16} />
-        </span>
-      </div>
-      <p className="mt-3 flex items-center gap-1.5 font-display text-xl font-semibold text-ink">
-        Смотреть
-        <ExternalLink size={15} className="text-ink-muted" />
-      </p>
-      {/* Когда ролик загрузили — видно прямо в карточке кампании. */}
-      {addedAt && (
-        <p className="mt-1 text-[11px] text-ink-muted tnum">
-          Добавлен {formatDateTime(addedAt)}
-        </p>
-      )}
-    </>
-  )
-}
-
 /**
  * Мок: ролики заявок, которые ещё не загрузили на сервер, — лежат в
  * `public/creatives`. Только для показа в карточке: в форму и на сервер они
@@ -196,11 +170,20 @@ const mockCreative = (campaignId) =>
     : null
 
 /**
- * Плитка ролика — по клику видео открывается в новой вкладке. Ролик нашего
- * хранилища и ролик по внешней ссылке открываются одинаково: файл отдаётся
- * по слагу без авторизации.
+ * Адрес вкладки с плеером. Прямая ссылка на файл скачивает его — хранилище
+ * отдаёт файл вложением, поэтому смотрим через свою страницу `/watch`.
  */
-export function CreativeTile({ url, addedAt }) {
+const watchHref = (url, name) => {
+  const search = new URLSearchParams({ src: fileHref(url) })
+  if (name) search.set('name', name)
+  return `/watch?${search}`
+}
+
+/**
+ * Плитка ролика: «Смотреть» открывает плеер в новой вкладке, значок в углу
+ * скачивает файл.
+ */
+export function CreativeTile({ url, name, addedAt }) {
   if (!url) {
     return (
       <div className="rounded-2xl border border-dashed border-line p-4">
@@ -217,19 +200,41 @@ export function CreativeTile({ url, addedAt }) {
     )
   }
 
-  const shell =
-    'group rounded-2xl border border-line bg-paper/55 p-4 text-left transition-colors hover:border-indigo-300 hover:bg-indigo-50 focus-ring'
-
   return (
-    <a
-      href={fileHref(url)}
-      target="_blank"
-      rel="noreferrer"
-      title="Открыть ролик в новой вкладке"
-      className={shell}
-    >
-      <CreativeBody addedAt={addedAt} />
-    </a>
+    <div className="rounded-2xl border border-line bg-paper/55 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[11px] font-medium uppercase tracking-wider text-ink-muted">
+          Ролик
+        </span>
+        {/* Значок в углу и есть «Скачать»: отдельной строкой плитка росла. */}
+        <button
+          type="button"
+          onClick={() => downloadFile({ url, name })}
+          aria-label="Скачать ролик"
+          title="Скачать ролик"
+          className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-100 text-indigo-900 transition-colors hover:bg-indigo-200 focus-ring"
+        >
+          <Download size={16} />
+        </button>
+      </div>
+
+      <a
+        href={watchHref(url, name)}
+        target="_blank"
+        rel="noreferrer"
+        title="Открыть ролик в новой вкладке"
+        className="mt-3 flex w-fit items-center gap-1.5 rounded-md font-display text-xl font-semibold text-ink transition-colors hover:text-indigo-800 focus-ring"
+      >
+        Смотреть
+        <ExternalLink size={15} className="text-ink-muted" />
+      </a>
+      {/* Когда ролик загрузили — видно прямо в карточке кампании. */}
+      {addedAt && (
+        <p className="mt-1 text-[11px] text-ink-muted tnum">
+          Добавлен {formatDateTime(addedAt)}
+        </p>
+      )}
+    </div>
   )
 }
 
@@ -400,6 +405,7 @@ export function CampaignPreviewModal({
     contract?.creative ??
     null
   const creativeUrl = creative?.url ?? ''
+  const creativeName = creative?.name || campaign?.creativeName || ''
   const creativeAddedAt = creative?.addedAt ?? null
 
   // Открыли другую кампанию — историю снова прячем.
@@ -457,7 +463,11 @@ export function CampaignPreviewModal({
           </div>
 
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <CreativeTile url={creativeUrl} addedAt={creativeAddedAt} />
+            <CreativeTile
+              url={creativeUrl}
+              name={creativeName}
+              addedAt={creativeAddedAt}
+            />
             <ContractTiles campaign={campaign} contract={contract} />
 
             {/* Плитка оплаты: по клику раскрывается история выплат. */}

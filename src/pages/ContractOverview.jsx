@@ -19,15 +19,12 @@ import {
   useContract,
   useContractPayments,
   useContracts,
-  useDeletePayment,
   useSaveContractMoney,
   useSetPaymentStatus,
   useStatusLog,
   useUpdateContract,
-  useUpdatePayment,
 } from '@/features/contracts/queries'
 import { useToast } from '@/components/ui/Toast.jsx'
-import { useConfirm } from '@/components/ui/Confirm.jsx'
 import {
   CONTRACT_PAYMENT,
   CONTRACT_STATUS,
@@ -36,8 +33,6 @@ import {
 } from '@/lib/metrics.js'
 import {
   formatDateNumeric,
-  formatDateTime,
-  formatMoney,
   formatMoneyCompact,
   formatPct,
 } from '@/lib/format.js'
@@ -52,7 +47,11 @@ import { Progress } from '@/components/ui/Progress.jsx'
 import { AnchoredPopover } from '@/components/ui/AnchoredPopover.jsx'
 import { ContractPreviewModal } from '@/components/campaigns/ContractPreviewModal.jsx'
 import { PaymentForm } from '@/components/forms/PaymentForm.jsx'
-import { MoneyPopover } from '@/components/campaigns/MoneyPopover.jsx'
+import {
+  MoneyPopover,
+  PaymentRow,
+} from '@/components/campaigns/MoneyPopover.jsx'
+import { usePaymentActions } from '@/components/campaigns/usePaymentActions.js'
 import { MonthTabs, MONTHS_FULL } from '@/components/campaigns/MonthTabs.jsx'
 import {
   StatusPopover,
@@ -153,10 +152,8 @@ export default function ContractOverview() {
   const { mutate: saveContractMoney } = useSaveContractMoney()
   const { mutate: savePaymentStatusFor, isPending: savingPaymentStatus } =
     useSetPaymentStatus()
-  const { mutate: updatePayment } = useUpdatePayment()
-  const { mutate: deletePayment } = useDeletePayment()
+  const { editPayment, removePayment } = usePaymentActions()
   const toast = useToast()
-  const confirm = useConfirm()
   const [q, setQ] = useState('')
   const [year, setYear] = useState(() => new Date().getFullYear())
   // Открываемся на текущем месяце; «все месяцы» — крестик у вкладок.
@@ -270,7 +267,7 @@ export default function ContractOverview() {
     .flatMap(({ contract, advertiser }) =>
       (contract.payments ?? []).map((payment) => ({
         ...payment,
-        contractNumber: contract.number,
+        contract,
         brand: advertiser.name,
       })),
     )
@@ -321,53 +318,6 @@ export default function ContractOverview() {
         },
         onError: (err) =>
           toast.error(err.message || 'Не удалось сохранить суммы договора'),
-      },
-    )
-  }
-
-  /** Правка даты и времени уже внесённого поступления. */
-  const editPayment = (paymentId, localValue) => {
-    const contract = moneyContract
-    if (!contract || !localValue) return
-    const paidAt = new Date(localValue)
-    if (Number.isNaN(paidAt.getTime())) return
-
-    updatePayment(
-      {
-        contractId: contract.id,
-        paymentId,
-        input: { paidAt: paidAt.toISOString() },
-      },
-      {
-        onError: (err) =>
-          toast.error(err.message || 'Не удалось изменить поступление'),
-      },
-    )
-  }
-
-  /** Удаление поступления: сумма вычитается из оплаченного по договору. */
-  const removePayment = async (paymentId) => {
-    const contract = moneyContract
-    const entry = (contract?.payments ?? []).find(
-      (item) => item.id === paymentId,
-    )
-    if (!entry) return
-
-    const ok = await confirm({
-      title: 'Удалить поступление?',
-      description: `${formatMoneyCompact(entry.amount)} · ${formatDateTime(
-        entry.paidAt,
-      )}`,
-      body: 'Сумма вычтется из оплаченного по договору.',
-    })
-    if (!ok) return
-
-    deletePayment(
-      { contractId: contract.id, paymentId },
-      {
-        onSuccess: () => toast.info('Поступление удалено'),
-        onError: (err) =>
-          toast.error(err.message || 'Не удалось удалить поступление'),
       },
     )
   }
@@ -474,24 +424,21 @@ export default function ContractOverview() {
                   : `За ${MONTHS_FULL[activeMonth].toLowerCase()} поступлений не было.`}
               </p>
             ) : (
+              // Площадка правит и удаляет поступления прямо здесь — каждое
+              // в своём договоре.
               payments.map((payment, i) => (
-                <div
+                <PaymentRow
                   key={payment.id}
-                  className="flex items-center gap-2 rounded-xl bg-paper px-3 py-2"
-                >
-                  <span className="w-5 shrink-0 text-[12px] text-ink-muted tnum">
-                    {i + 1}
-                  </span>
-                  <span className="shrink-0 text-[12px] text-ink-muted tnum">
-                    {formatDateTime(payment.paidAt)}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-[12px] text-ink-soft">
-                    {payment.brand} · {payment.contractNumber}
-                  </span>
-                  <span className="shrink-0 text-[13px] font-semibold text-emerald-700 tnum">
-                    + {formatMoney(payment.amount)}
-                  </span>
-                </div>
+                  index={i}
+                  payment={payment}
+                  label={`${payment.brand} · ${payment.contract.number}`}
+                  editable={canEditMoney}
+                  onSave={(input) =>
+                    editPayment(payment.contract, payment.id, input)
+                  }
+                  onRemove={() => removePayment(payment.contract, payment)}
+                  className="bg-paper px-3 py-2"
+                />
               ))
             )}
           </div>
@@ -731,8 +678,10 @@ export default function ContractOverview() {
           spent={toNumber(moneyContract.spent)}
           payments={moneyPayments ?? moneyContract.payments ?? []}
           onSave={saveMoney}
-          onEditPayment={editPayment}
-          onRemovePayment={removePayment}
+          onEditPayment={(paymentId, input) =>
+            editPayment(moneyContract, paymentId, input)
+          }
+          onRemovePayment={(payment) => removePayment(moneyContract, payment)}
           onClose={() => setMoneyAnchor(null)}
         />
       )}
@@ -747,8 +696,11 @@ export default function ContractOverview() {
           statusByPeriod={paymentRow.contract.paymentStatusByPeriod ?? {}}
           period={activePeriod ?? periodKey(activeYear, new Date().getMonth())}
           years={years}
-          // Месяц выбран вкладкой — в поповере меняется только число.
-          monthLocked={activePeriod != null}
+          start={paymentRow.contract.start}
+          end={paymentRow.contract.end}
+          hiddenMonths={paymentRow.contract.hiddenMonths ?? []}
+          // Месяц выбран вкладкой — в поповере выбирают месяц, без даты.
+          monthOnly={activePeriod != null}
           saving={savingPaymentStatus}
           readOnly={!canEditMoney}
           onSave={savePaymentStatus}

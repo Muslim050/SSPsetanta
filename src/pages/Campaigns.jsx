@@ -20,11 +20,9 @@ import { useVisibleAdvertisers } from '@/features/advertisers/queries'
 import { downloadFile } from '@/features/files/download'
 import {
   useContractPayments,
-  useDeletePayment,
   useSaveContractMoney,
   useSetPaymentStatus,
   useStatusLog,
-  useUpdatePayment,
 } from '@/features/contracts/queries'
 import { useScopedCampaigns } from '@/lib/useScope.js'
 import {
@@ -36,7 +34,6 @@ import {
   timeProgress,
 } from '@/lib/metrics.js'
 import { useToast } from '@/components/ui/Toast.jsx'
-import { useConfirm } from '@/components/ui/Confirm.jsx'
 import {
   formatDateNumeric,
   formatDateTime,
@@ -57,6 +54,7 @@ import { BrandTabs } from '@/components/campaigns/BrandTabs.jsx'
 import { MonthTabs, MONTHS_FULL } from '@/components/campaigns/MonthTabs.jsx'
 import { MediaReport } from '@/components/campaigns/MediaReport.jsx'
 import { MoneyPopover } from '@/components/campaigns/MoneyPopover.jsx'
+import { usePaymentActions } from '@/components/campaigns/usePaymentActions.js'
 import { ContractModal } from '@/components/campaigns/ContractModal.jsx'
 import {
   StatusPopover,
@@ -251,10 +249,8 @@ export default function Campaigns() {
   const { mutate: saveContractMoney } = useSaveContractMoney()
   const { mutate: savePaymentStatusFor, isPending: savingPaymentStatus } =
     useSetPaymentStatus()
-  const { mutate: updatePayment } = useUpdatePayment()
-  const { mutate: deletePayment } = useDeletePayment()
+  const { editPayment, removePayment } = usePaymentActions()
   const toast = useToast()
-  const confirm = useConfirm()
 
   const [q, setQ] = useState('')
   const [status, setStatus] = useState('all')
@@ -344,17 +340,21 @@ export default function Campaigns() {
   // Показываем только месяцы срока договора — и годы только его.
   const contractStart = monthOfDate(selectedContract?.start)
   const contractEnd = monthOfDate(selectedContract?.end)
+  // Месяцы, скрытые в договоре (серые в его календаре), — как и на «Статусе
+  // оплаты», здесь их нет.
+  const hiddenMonths = selectedContract?.hiddenMonths ?? []
 
   const currentYear = new Date().getFullYear()
   const allYears = yearsOf(contractCampaigns, currentYear)
-  const termYears = allYears.filter(
-    (y) =>
-      (!contractStart || y >= contractStart.year) &&
-      (!contractEnd || y <= contractEnd.year),
+  // Годы — весь срок договора подряд, а не только те, где уже есть
+  // кампании: договор до 2027 года иначе листался бы до последней кампании.
+  // Открытую сторону срока доводим до лет кампаний и текущего.
+  const lastYear = contractEnd?.year ?? allYears[allYears.length - 1]
+  const firstYear = Math.min(contractStart?.year ?? allYears[0], lastYear)
+  const years = Array.from(
+    { length: lastYear - firstYear + 1 },
+    (_, i) => firstYear + i,
   )
-  const years = termYears.length
-    ? termYears
-    : [(contractEnd ?? contractStart).year]
   // Год мог пропасть вместе со сменой бренда или договора.
   const activeYear = years.includes(year)
     ? year
@@ -372,7 +372,9 @@ export default function Campaigns() {
     showMonths &&
     month != null &&
     isPassedMonth(activeYear, month) &&
-    !isOutsideTerm(contractStart, contractEnd, activeYear, month)
+    !isOutsideTerm(contractStart, contractEnd, activeYear, month) &&
+    // Скрытый месяц не открывается и по ссылке с `?month=`.
+    !hiddenMonths.includes(periodKey(activeYear, month))
       ? month
       : null
   // Внутри выбранного месяца переключаемся между отчётом и списком кампаний.
@@ -608,51 +610,6 @@ export default function Campaigns() {
         },
         onError: (err) =>
           toast.error(err.message || 'Не удалось изменить статус оплаты'),
-      },
-    )
-  }
-
-  /** Правка даты и времени уже внесённого поступления. */
-  const editPayment = (paymentId, localValue) => {
-    if (!moneyContract || !localValue) return
-    const paidAt = new Date(localValue)
-    if (Number.isNaN(paidAt.getTime())) return
-
-    updatePayment(
-      {
-        contractId: moneyContract.id,
-        paymentId,
-        input: { paidAt: paidAt.toISOString() },
-      },
-      {
-        onError: (err) =>
-          toast.error(err.message || 'Не удалось изменить поступление'),
-      },
-    )
-  }
-
-  /** Удаление поступления: сумма вычитается из оплаченного по договору. */
-  const removePayment = async (paymentId) => {
-    const entry = (moneyContract?.payments ?? []).find(
-      (item) => item.id === paymentId,
-    )
-    if (!entry) return
-
-    const ok = await confirm({
-      title: 'Удалить поступление?',
-      description: `${formatMoneyCompact(entry.amount)} · ${formatDateTime(
-        entry.paidAt,
-      )}`,
-      body: 'Сумма вычтется из оплаченного по договору.',
-    })
-    if (!ok) return
-
-    deletePayment(
-      { contractId: moneyContract.id, paymentId },
-      {
-        onSuccess: () => toast.info('Поступление удалено'),
-        onError: (err) =>
-          toast.error(err.message || 'Не удалось удалить поступление'),
       },
     )
   }
@@ -920,6 +877,7 @@ export default function Campaigns() {
             statuses={monthStatuses}
             since={contractStart}
             until={contractEnd}
+            hidden={hiddenMonths}
           />
         </div>
       )}
@@ -1247,9 +1205,11 @@ export default function Campaigns() {
           budget={toNumber(moneyContract.budget)}
           spent={toNumber(moneyContract.spent)}
           payments={moneyPayments ?? moneyContract.payments ?? []}
-          onRemovePayment={removePayment}
+          onRemovePayment={(payment) => removePayment(moneyContract, payment)}
           onSave={saveMoney}
-          onEditPayment={editPayment}
+          onEditPayment={(paymentId, input) =>
+            editPayment(moneyContract, paymentId, input)
+          }
           onClose={() => setMoney(null)}
         />
       )}
@@ -1264,6 +1224,9 @@ export default function Campaigns() {
           statusByPeriod={statusByPeriod}
           period={activePeriod ?? periodKey(activeYear, new Date().getMonth())}
           years={years}
+          start={selectedContract.start}
+          end={selectedContract.end}
+          hiddenMonths={hiddenMonths}
           saving={savingPaymentStatus}
           readOnly={!canEditMoney}
           onSave={savePaymentStatus}

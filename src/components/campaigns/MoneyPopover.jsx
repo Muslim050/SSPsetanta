@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, Trash2, X } from 'lucide-react'
+import {
+  Check,
+  ChevronDown,
+  Loader2,
+  Pencil,
+  Plus,
+  Trash2,
+  X,
+} from 'lucide-react'
 import { useAuth } from '@/features/auth/useAuth'
 import {
   formatDateTime,
@@ -9,6 +17,7 @@ import {
   paidAtOf,
 } from '@/lib/format.js'
 import { Button } from '@/components/ui/Button'
+import { DateTimePicker } from '@/components/ui/DateTimePicker.jsx'
 import { Field, Input } from '@/components/ui/Field'
 import { cn } from '@/lib/cn.js'
 import { usePopoverPlacement } from '@/lib/usePopoverPlacement.js'
@@ -32,7 +41,7 @@ const amountField = (value) => {
   return rounded ? groupDigits(String(rounded)) : ''
 }
 
-/** Дата со временем для input[type=datetime-local] — в местной зоне. */
+/** Дата со временем для DateTimePicker — в местной зоне. */
 const toDateTimeInput = (date) => {
   const pad = (n) => String(n).padStart(2, '0')
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
@@ -40,10 +49,297 @@ const toDateTimeInput = (date) => {
   )}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
+const rowButton =
+  'shrink-0 rounded-lg p-1 text-ink-muted transition-colors focus-ring disabled:opacity-50'
+
+const inputClass =
+  'rounded-lg border border-line bg-surface px-2 py-1 text-ink transition-colors focus-ring focus-visible:border-indigo-300'
+
+// Поступление показываем с копейками — сервер хранит их (decimal, до 2 знаков).
+const paymentMoney = new Intl.NumberFormat('ru-RU', {
+  maximumFractionDigits: 2,
+})
+
+/** Сумма поступления для поля: «59126163.30» → «59 126 163,3». */
+const decimalField = (value) => {
+  const [whole, fraction = ''] = String(value ?? '').split('.')
+  const cents = fraction.replace(/0+$/, '')
+  const grouped = groupDigits(whole)
+  return cents ? `${grouped || '0'},${cents}` : grouped
+}
+
+/** Ввод суммы: разряды пробелами, одна запятая и до двух знаков после неё. */
+const typeDecimal = (raw) => {
+  const [whole, ...rest] = String(raw).replace(/\./g, ',').split(',')
+  const grouped = groupDigits(whole)
+  if (!rest.length) return grouped
+  return `${grouped || '0'},${onlyDigits(rest.join('')).slice(0, 2)}`
+}
+
+/** Поле → decimal-строка для API: «59 126 163,3» → «59126163.3». */
+const toDecimal = (field) => {
+  const [whole, fraction = ''] = field.split(',')
+  const digits = onlyDigits(whole).replace(/^0+(?=\d)/, '') || '0'
+  const cents = onlyDigits(fraction).replace(/0+$/, '')
+  return cents ? `${digits}.${cents}` : digits
+}
+
+/**
+ * Комментарий к выплате: одна строка с многоточием, а если не влез —
+ * раскрывается по клику целиком и сворачивается обратно.
+ */
+function PaymentComment({ text }) {
+  const [expanded, setExpanded] = useState(false)
+  // Обрезан ли текст многоточием — меряем, пока он свёрнут.
+  const [clipped, setClipped] = useState(false)
+  const measure = (el) => {
+    if (el && !expanded) setClipped(el.scrollWidth > el.clientWidth)
+  }
+
+  if (!clipped && !expanded) {
+    return (
+      <p ref={measure} className="truncate text-[11px] text-ink-muted">
+        {text}
+      </p>
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setExpanded((value) => !value)}
+      aria-expanded={expanded}
+      title={expanded ? 'Свернуть комментарий' : 'Показать комментарий целиком'}
+      className="flex w-full min-w-0 items-start gap-1 rounded text-left text-[11px] text-ink-muted transition-colors hover:text-ink-soft focus-ring"
+    >
+      <span
+        ref={measure}
+        className={cn(
+          'min-w-0 flex-1',
+          expanded ? 'whitespace-pre-wrap break-words' : 'truncate',
+        )}
+      >
+        {text}
+      </span>
+      <ChevronDown
+        size={12}
+        className={cn(
+          'mt-0.5 shrink-0 transition-transform',
+          expanded && 'rotate-180',
+        )}
+      />
+    </button>
+  )
+}
+
+/**
+ * Строка истории выплат. Площадка правит в ней поступление — дату, сумму
+ * с копейками и комментарий разом, по «Сохранить», — и удаляет его.
+ * `label` — подпись под датой, например бренд и договор в общей истории
+ * по всем договорам.
+ *
+ * onSave получает тело PATCH целиком — `{ amount, paidAt, comment }` — и
+ * отдаёт true, если сервер его принял. onRemove — удалить поступление.
+ */
+export function PaymentRow({
+  index,
+  payment,
+  label,
+  editable = false,
+  onSave,
+  onRemove,
+  className,
+}) {
+  const [editing, setEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [paidAt, setPaidAt] = useState('')
+  const [amount, setAmount] = useState('')
+  const [comment, setComment] = useState('')
+
+  const savedPaidAt = paidAtOf(payment)
+  const initialPaidAt = toDateTimeInput(new Date(savedPaidAt))
+  const savedAmount = toDecimal(decimalField(payment.amount))
+  const savedComment = payment.comment ?? ''
+  const nextAmount = toDecimal(amount)
+  const valid = !!paidAt && Number(nextAmount) > 0
+
+  const start = () => {
+    setPaidAt(initialPaidAt)
+    setAmount(decimalField(payment.amount))
+    setComment(savedComment)
+    setEditing(true)
+  }
+
+  const save = async () => {
+    if (!valid || saving) return
+    const nextComment = comment.trim()
+    // Ничего не поменяли — на сервер не ходим.
+    if (
+      paidAt === initialPaidAt &&
+      nextAmount === savedAmount &&
+      nextComment === savedComment
+    ) {
+      return setEditing(false)
+    }
+
+    setSaving(true)
+    const ok = await onSave({
+      amount: nextAmount,
+      // Поле даты — с точностью до минуты: не трогали его — отправляем дату
+      // как есть, иначе секунды поступления обнулились бы молча.
+      paidAt:
+        paidAt === initialPaidAt ? savedPaidAt : new Date(paidAt).toISOString(),
+      comment: nextComment,
+    })
+    setSaving(false)
+    // Ошибка — остаёмся в правке, введённое не теряется.
+    if (ok) setEditing(false)
+  }
+
+  // Enter и Escape здесь свои: не сохранять вкладку «Поступление» и не
+  // закрывать поповер, а сохранить или отменить правку строки.
+  const onKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      e.stopPropagation()
+      save()
+    } else if (e.key === 'Escape') {
+      e.stopPropagation()
+      setEditing(false)
+    }
+  }
+
+  if (editing) {
+    return (
+      <div
+        onKeyDown={onKeyDown}
+        className={cn(
+          'space-y-1.5 rounded-xl bg-paper/70 px-2 py-1.5',
+          className,
+        )}
+      >
+        <div className="flex items-center gap-1.5">
+          <span className="w-4 shrink-0 text-[10px] text-ink-muted tnum">
+            {index + 1}
+          </span>
+          <DateTimePicker
+            value={paidAt}
+            onChange={setPaidAt}
+            aria-label="Дата и время выплаты"
+            className="h-[26px] min-w-0 flex-1 rounded-lg px-2 text-[11px] [&>svg]:size-3.5"
+          />
+          <input
+            inputMode="decimal"
+            autoFocus
+            value={amount}
+            onChange={(e) => setAmount(typeDecimal(e.target.value))}
+            aria-label="Сумма выплаты"
+            placeholder="0"
+            className={cn(
+              inputClass,
+              'w-[112px] shrink-0 text-right text-[12px] font-semibold tnum',
+            )}
+          />
+          <button
+            type="button"
+            onClick={save}
+            disabled={!valid || saving}
+            aria-label="Сохранить поступление"
+            title="Сохранить"
+            className={cn(
+              rowButton,
+              'hover:bg-emerald-50 hover:text-emerald-700',
+            )}
+          >
+            {saving ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Check size={14} />
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => setEditing(false)}
+            disabled={saving}
+            aria-label="Отменить правку"
+            title="Отменить"
+            className={cn(rowButton, 'hover:bg-ink/6 hover:text-ink')}
+          >
+            <X size={14} />
+          </button>
+        </div>
+        {/* Пустая ячейка под номером: комментарий встаёт вровень с датой
+            и кончается там же, где кнопки строки над ним. */}
+        <div className="flex items-center gap-1.5">
+          <span className="w-4 shrink-0" />
+          <input
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            aria-label="Комментарий к выплате"
+            placeholder="Комментарий"
+            className={cn(inputClass, 'min-w-0 flex-1 text-[11px]')}
+          />
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className={cn(
+        'flex items-center gap-2 rounded-xl bg-paper/70 px-2 py-1.5',
+        className,
+      )}
+    >
+      <span className="w-4 shrink-0 text-[10px] text-ink-muted tnum">
+        {index + 1}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[12px] text-ink-muted tnum">
+          {formatDateTime(savedPaidAt)}
+        </p>
+        {label && <p className="truncate text-[11px] text-ink-soft">{label}</p>}
+        {/* key: после правки комментарий снова свёрнут и перемерен. */}
+        {savedComment && (
+          <PaymentComment key={savedComment} text={savedComment} />
+        )}
+      </div>
+      <span className="shrink-0 text-[13px] font-semibold text-emerald-700 tnum">
+        + {paymentMoney.format(Number(payment.amount) || 0)}
+      </span>
+      {editable && onSave && (
+        <button
+          type="button"
+          onClick={start}
+          aria-label="Изменить поступление"
+          title="Изменить дату, сумму и комментарий"
+          className={cn(rowButton, 'hover:bg-ink/6 hover:text-indigo-800')}
+        >
+          <Pencil size={14} />
+        </button>
+      )}
+      {/* Ошибочное поступление можно убрать: сумма вернётся. */}
+      {editable && onRemove && (
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label="Удалить поступление"
+          title="Удалить поступление"
+          className={cn(rowButton, 'hover:bg-danger/10 hover:text-danger')}
+        >
+          <Trash2 size={14} />
+        </button>
+      )}
+    </div>
+  )
+}
+
 /**
  * Правка сумм договора: сумма договора, оплачено и разовое поступление,
  * которое прибавляется к оплаченному. Вторая вкладка — история выплат
- * с датой и временем каждого платежа.
+ * с датой и временем каждого платежа: в ней поступление правят
+ * (`onEditPayment(id, { amount, paidAt, comment })` → true, если сохранено)
+ * и удаляют (`onRemovePayment(payment)`).
  * Рисуется порталом с position: fixed — иначе таблица его обрежет.
  */
 export function MoneyPopover({
@@ -185,7 +481,8 @@ export function MoneyPopover({
         maxHeight: placement.maxHeight,
       }}
       className="fixed z-50 overflow-y-auto rounded-2xl border border-line bg-surface p-4 shadow-lift"
-      onKeyDown={(e) => e.key === 'Enter' && save()}
+      // Enter сохраняет только вкладку «Поступление»: в истории он свой.
+      onKeyDown={(e) => e.key === 'Enter' && tab === 'pay' && save()}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -276,11 +573,10 @@ export function MoneyPopover({
             </Field>
 
             <Field label="Дата поступления">
-              <Input
-                type="datetime-local"
+              <DateTimePicker
                 value={paidAt}
-                onChange={(e) => setPaidAt(e.target.value)}
-                className="h-9 text-[13px] tnum"
+                onChange={setPaidAt}
+                className="h-9 text-[13px]"
               />
             </Field>
           </div>
@@ -317,43 +613,17 @@ export function MoneyPopover({
               </p>
             ) : (
               payments.map((payment, index) => (
-                <div
+                <PaymentRow
                   key={payment.id}
-                  className="flex items-center justify-between gap-2 rounded-xl bg-paper/70 px-2 py-1.5"
-                >
-                  <div className="text-[10px] text-ink-muted">{index + 1}</div>
-                  {/* Дату и время выплаты можно поправить прямо в истории. */}
-                  {editable ? (
-                    <input
-                      type="datetime-local"
-                      value={toDateTimeInput(new Date(paidAtOf(payment)))}
-                      onChange={(e) =>
-                        onEditPayment(payment.id, e.target.value)
-                      }
-                      aria-label="Дата и время выплаты"
-                      className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-2 py-1 text-[11px] text-ink transition-colors tnum focus-ring focus-visible:border-indigo-300"
-                    />
-                  ) : (
-                    <span className="text-[12px] text-ink-muted tnum">
-                      {formatDateTime(paidAtOf(payment))}
-                    </span>
-                  )}
-                  <span className="shrink-0 text-[13px] font-semibold text-emerald-700 tnum">
-                    + {formatMoney(payment.amount)}
-                  </span>
-                  {/* Ошибочное поступление можно убрать: сумма вернётся. */}
-                  {editable && onRemovePayment && (
-                    <button
-                      type="button"
-                      onClick={() => onRemovePayment(payment.id)}
-                      aria-label="Удалить поступление"
-                      title="Удалить поступление"
-                      className="shrink-0 rounded-lg p-1 text-ink-muted transition-colors hover:bg-danger/10 hover:text-danger focus-ring"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  )}
-                </div>
+                  index={index}
+                  payment={payment}
+                  editable={editable}
+                  onSave={
+                    onEditPayment &&
+                    ((input) => onEditPayment(payment.id, input))
+                  }
+                  onRemove={onRemovePayment && (() => onRemovePayment(payment))}
+                />
               ))
             )}
           </div>

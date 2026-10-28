@@ -288,7 +288,7 @@ export function useSetPaymentStatus() {
   })
 }
 
-/** Правка поступления — в интерфейсе меняется только его дата. */
+/** Правка поступления: дата, сумма и комментарий. */
 export function useUpdatePayment() {
   const client = useQueryClient()
 
