@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react'
+import {
+  Check,
+  ChevronDown,
+  Loader2,
+  Pencil,
+  Plus,
+  Trash2,
+  X,
+} from 'lucide-react'
 import { useAuth } from '@/features/auth/useAuth'
 import {
   formatDateTime,
@@ -9,6 +17,7 @@ import {
   paidAtOf,
 } from '@/lib/format.js'
 import { Button } from '@/components/ui/Button'
+import { DateTimePicker } from '@/components/ui/DateTimePicker.jsx'
 import { Field, Input } from '@/components/ui/Field'
 import { cn } from '@/lib/cn.js'
 import { usePopoverPlacement } from '@/lib/usePopoverPlacement.js'
@@ -32,7 +41,7 @@ const amountField = (value) => {
   return rounded ? groupDigits(String(rounded)) : ''
 }
 
-/** Дата со временем для input[type=datetime-local] — в местной зоне. */
+/** Дата со временем для DateTimePicker — в местной зоне. */
 const toDateTimeInput = (date) => {
   const pad = (n) => String(n).padStart(2, '0')
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
@@ -73,6 +82,54 @@ const toDecimal = (field) => {
   const digits = onlyDigits(whole).replace(/^0+(?=\d)/, '') || '0'
   const cents = onlyDigits(fraction).replace(/0+$/, '')
   return cents ? `${digits}.${cents}` : digits
+}
+
+/**
+ * Комментарий к выплате: одна строка с многоточием, а если не влез —
+ * раскрывается по клику целиком и сворачивается обратно.
+ */
+function PaymentComment({ text }) {
+  const [expanded, setExpanded] = useState(false)
+  // Обрезан ли текст многоточием — меряем, пока он свёрнут.
+  const [clipped, setClipped] = useState(false)
+  const measure = (el) => {
+    if (el && !expanded) setClipped(el.scrollWidth > el.clientWidth)
+  }
+
+  if (!clipped && !expanded) {
+    return (
+      <p ref={measure} className="truncate text-[11px] text-ink-muted">
+        {text}
+      </p>
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setExpanded((value) => !value)}
+      aria-expanded={expanded}
+      title={expanded ? 'Свернуть комментарий' : 'Показать комментарий целиком'}
+      className="flex w-full min-w-0 items-start gap-1 rounded text-left text-[11px] text-ink-muted transition-colors hover:text-ink-soft focus-ring"
+    >
+      <span
+        ref={measure}
+        className={cn(
+          'min-w-0 flex-1',
+          expanded ? 'whitespace-pre-wrap break-words' : 'truncate',
+        )}
+      >
+        {text}
+      </span>
+      <ChevronDown
+        size={12}
+        className={cn(
+          'mt-0.5 shrink-0 transition-transform',
+          expanded && 'rotate-180',
+        )}
+      />
+    </button>
+  )
 }
 
 /**
@@ -165,12 +222,11 @@ export function PaymentRow({
           <span className="w-4 shrink-0 text-[10px] text-ink-muted tnum">
             {index + 1}
           </span>
-          <input
-            type="datetime-local"
+          <DateTimePicker
             value={paidAt}
-            onChange={(e) => setPaidAt(e.target.value)}
+            onChange={setPaidAt}
             aria-label="Дата и время выплаты"
-            className={cn(inputClass, 'min-w-0 flex-1 text-[11px] tnum')}
+            className="h-[26px] min-w-0 flex-1 rounded-lg px-2 text-[11px] [&>svg]:size-3.5"
           />
           <input
             inputMode="decimal"
@@ -243,13 +299,9 @@ export function PaymentRow({
           {formatDateTime(savedPaidAt)}
         </p>
         {label && <p className="truncate text-[11px] text-ink-soft">{label}</p>}
+        {/* key: после правки комментарий снова свёрнут и перемерен. */}
         {savedComment && (
-          <p
-            className="truncate text-[11px] text-ink-muted"
-            title={savedComment}
-          >
-            {savedComment}
-          </p>
+          <PaymentComment key={savedComment} text={savedComment} />
         )}
       </div>
       <span className="shrink-0 text-[13px] font-semibold text-emerald-700 tnum">
@@ -521,11 +573,10 @@ export function MoneyPopover({
             </Field>
 
             <Field label="Дата поступления">
-              <Input
-                type="datetime-local"
+              <DateTimePicker
                 value={paidAt}
-                onChange={(e) => setPaidAt(e.target.value)}
-                className="h-9 text-[13px] tnum"
+                onChange={setPaidAt}
+                className="h-9 text-[13px]"
               />
             </Field>
           </div>
