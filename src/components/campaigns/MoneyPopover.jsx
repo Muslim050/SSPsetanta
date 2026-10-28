@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react'
+import {
+  Check,
+  ChevronDown,
+  Loader2,
+  Pencil,
+  Plus,
+  Trash2,
+  X,
+} from 'lucide-react'
 import { useAuth } from '@/features/auth/useAuth'
 import {
   formatDateTime,
@@ -74,6 +82,54 @@ const toDecimal = (field) => {
   const digits = onlyDigits(whole).replace(/^0+(?=\d)/, '') || '0'
   const cents = onlyDigits(fraction).replace(/0+$/, '')
   return cents ? `${digits}.${cents}` : digits
+}
+
+/**
+ * Комментарий к выплате: одна строка с многоточием, а если не влез —
+ * раскрывается по клику целиком и сворачивается обратно.
+ */
+function PaymentComment({ text }) {
+  const [expanded, setExpanded] = useState(false)
+  // Обрезан ли текст многоточием — меряем, пока он свёрнут.
+  const [clipped, setClipped] = useState(false)
+  const measure = (el) => {
+    if (el && !expanded) setClipped(el.scrollWidth > el.clientWidth)
+  }
+
+  if (!clipped && !expanded) {
+    return (
+      <p ref={measure} className="truncate text-[11px] text-ink-muted">
+        {text}
+      </p>
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setExpanded((value) => !value)}
+      aria-expanded={expanded}
+      title={expanded ? 'Свернуть комментарий' : 'Показать комментарий целиком'}
+      className="flex w-full min-w-0 items-start gap-1 rounded text-left text-[11px] text-ink-muted transition-colors hover:text-ink-soft focus-ring"
+    >
+      <span
+        ref={measure}
+        className={cn(
+          'min-w-0 flex-1',
+          expanded ? 'whitespace-pre-wrap break-words' : 'truncate',
+        )}
+      >
+        {text}
+      </span>
+      <ChevronDown
+        size={12}
+        className={cn(
+          'mt-0.5 shrink-0 transition-transform',
+          expanded && 'rotate-180',
+        )}
+      />
+    </button>
+  )
 }
 
 /**
@@ -243,13 +299,9 @@ export function PaymentRow({
           {formatDateTime(savedPaidAt)}
         </p>
         {label && <p className="truncate text-[11px] text-ink-soft">{label}</p>}
+        {/* key: после правки комментарий снова свёрнут и перемерен. */}
         {savedComment && (
-          <p
-            className="truncate text-[11px] text-ink-muted"
-            title={savedComment}
-          >
-            {savedComment}
-          </p>
+          <PaymentComment key={savedComment} text={savedComment} />
         )}
       </div>
       <span className="shrink-0 text-[13px] font-semibold text-emerald-700 tnum">
