@@ -1,3 +1,4 @@
+import { leagueNames, sportName } from '@/lib/audienceOptions.js'
 import { cloneOverview } from '@/lib/overviewSeed.js'
 
 /**
@@ -51,14 +52,14 @@ export function audienceFromServer(stats) {
       ...platform,
       data: sharesFrom(
         platform.data,
-        platform.platform === 'OTT' ? stats?.ottDevice : stats?.tvDevice,
+        platform.id === 'pf_ott' ? stats?.ottDevice : stats?.tvDevice,
         deviceKey,
       ),
     })),
     leagueAgeRows: (stats?.leagueRows ?? []).map((row, index) => ({
       id: `lg_${index}`,
-      sport: row.sport,
-      leagues: row.league,
+      sport: sportName(row.sport),
+      leagues: leagueNames(row.league),
       ages: AGE_KEYS.map((key) => num(row.age?.[key])),
     })),
     cityShare: (stats?.geo ?? []).map((row, index) => ({
@@ -105,11 +106,11 @@ export function audienceToInput(data) {
     age: sharesTo(data.ageShare, ageKey),
     device: sharesTo(data.deviceShare, deviceKey),
     ottDevice: sharesTo(
-      data.platformDeviceShare.find((p) => p.platform === 'OTT').data,
+      data.platformDeviceShare.find((p) => p.id === 'pf_ott').data,
       deviceKey,
     ),
     tvDevice: sharesTo(
-      data.platformDeviceShare.find((p) => p.platform === 'TV').data,
+      data.platformDeviceShare.find((p) => p.id === 'pf_tv').data,
       deviceKey,
     ),
     leagueRows: data.leagueAgeRows.map((row) => ({

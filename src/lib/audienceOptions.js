@@ -4,20 +4,36 @@
  * вписать, сервер принимает любую строку.
  */
 
-// Лиги — те же, что в договорах (LEAGUES), сгруппированные по видам спорта.
-// Несколько лиг в строке отчёта выбирают галочками — сервер хранит их одной
-// строкой через запятую.
+// Лиги — те же, что в договорах (LEAGUES), сгруппированные по видам спорта;
+// футбольные — по-русски. Несколько лиг в строке отчёта выбирают галочками —
+// сервер хранит их одной строкой через запятую.
 export const SPORT_LEAGUES = {
-  Football: ['EPL', 'LaLiga', 'Bundesliga', 'Ligue 1', 'Serie A'],
-  'MMA Fights': ['UFC', 'Bellator', 'PFL'],
-  Racing: ['F1'],
-  Tennis: ['ATP', 'WTA'],
-  Basketball: ['NBA'],
-  Hockey: ['NHL'],
-  Boxing: ['Zuffa Boxing'],
+  Футбол: ['АПЛ', 'Ла Лига', 'Бундеслига', 'Лига 1', 'Серия А'],
+  'Бои ММА': ['UFC', 'Bellator', 'PFL'],
+  Автогонки: ['F1'],
+  Теннис: ['ATP', 'WTA'],
+  Баскетбол: ['NBA'],
+  Хоккей: ['NHL'],
+  Бокс: ['Zuffa Boxing'],
 }
 
 export const SPORTS = Object.keys(SPORT_LEAGUES)
+
+// Прежние английские названия видов спорта — ими сервер хранит строки,
+// введённые до перевода.
+const SPORT_RU = {
+  football: 'Футбол',
+  'mma fights': 'Бои ММА',
+  racing: 'Автогонки',
+  tennis: 'Теннис',
+  basketball: 'Баскетбол',
+  hockey: 'Хоккей',
+  boxing: 'Бокс',
+}
+
+/** Вид спорта по-русски: «Football» → «Футбол»; свой — как есть. */
+export const sportName = (sport) =>
+  SPORT_RU[(sport ?? '').trim().toLowerCase()] ?? sport ?? ''
 
 /** Все лиги подряд — для полей без вида спорта. */
 export const ALL_LEAGUES = Object.values(SPORT_LEAGUES).flat()
@@ -35,6 +51,24 @@ export const splitLeagues = (text) =>
 
 /** Список лиг → строка для сервера. */
 export const joinLeagues = (list) => list.join(', ')
+
+// Прежние латинские названия футбольных лиг — так они лежат в отчётах,
+// введённых до перевода.
+const LEAGUE_RU = {
+  epl: 'АПЛ',
+  laliga: 'Ла Лига',
+  bundesliga: 'Бундеслига',
+  'ligue 1': 'Лига 1',
+  'serie a': 'Серия А',
+}
+
+/** Строка лиг по-русски: «EPL, UFC» → «АПЛ, UFC»; свои — как есть. */
+export const leagueNames = (text) =>
+  joinLeagues(
+    splitLeagues(text).map(
+      (league) => LEAGUE_RU[league.toLowerCase()] ?? league,
+    ),
+  )
 
 /** Города и области Узбекистана — сначала крупные города. */
 export const UZ_CITIES = [

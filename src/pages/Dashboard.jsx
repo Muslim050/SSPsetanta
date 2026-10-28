@@ -230,7 +230,7 @@ function AudienceAgeReport({ data, editing, patch, emptyText }) {
           <div className="flex items-start justify-between gap-4 border-b border-line bg-paper/45 p-5">
             <div>
               <h3 className="font-display text-lg font-semibold text-ink">
-                Устройства: OTT и TV
+                Устройства: OTT и ТВ
               </h3>
               <p className="mt-1 text-[13px] text-ink-muted">
                 Доля просмотров по типам экранов в каждой среде.
@@ -301,8 +301,8 @@ function AudienceAgeReport({ data, editing, patch, emptyText }) {
           <table className="w-full min-w-[820px] text-sm">
             <thead className="bg-ink text-white">
               <tr className="text-[11px] font-semibold uppercase tracking-wider">
-                <th className="px-5 py-3 text-left">Sport</th>
-                <th className="px-5 py-3 text-left">League</th>
+                <th className="px-5 py-3 text-left">Спорт</th>
+                <th className="px-5 py-3 text-left">Лиги</th>
                 {AGE_COLUMNS.map(({ label }) => (
                   <th key={label} className="px-4 py-3 text-center">
                     {label}
