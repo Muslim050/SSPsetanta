@@ -977,6 +977,7 @@ export default function Dashboard() {
             onChange={single.pickMonth}
             // Месяц обязателен, поэтому сброс возвращает к текущему.
             resetLabel="Вернуться к текущему месяцу"
+            yearArrows
           />
         )}
       </div>

@@ -164,6 +164,8 @@ export function NowMark() {
  * например срок договора: месяцы вне них не показываем. null — без границы.
  * hidden: месяцы `YYYY-MM`, которых тоже не показываем, — скрытые в
  * договоре (`hiddenMonths`).
+ * yearArrows: год — стрелками (YearSwitcher) слева от месяцев, а не строкой
+ * над ними. Годится, когда годов немного и прятать нечего.
  */
 export function MonthTabs({
   year,
@@ -179,6 +181,7 @@ export function MonthTabs({
   since = null,
   until = null,
   hidden = [],
+  yearArrows = false,
   className,
 }) {
   const now = new Date()
@@ -190,8 +193,22 @@ export function MonthTabs({
   return (
     // Крестик — по нижнему краю, вровень с месяцами, а не с годами над ними.
     <div className={cn('flex items-end gap-2', className)}>
-      <div className="flex min-w-0 flex-col items-start gap-1.5">
-        <YearRow year={year} years={years} onChange={onYearChange} />
+      <div
+        className={cn(
+          'flex min-w-0 items-start gap-1.5',
+          yearArrows ? 'flex-row' : 'flex-col',
+        )}
+      >
+        {yearArrows ? (
+          <YearSwitcher
+            year={year}
+            years={years}
+            onChange={onYearChange}
+            className="self-stretch"
+          />
+        ) : (
+          <YearRow year={year} years={years} onChange={onYearChange} />
+        )}
 
         <div
           role="tablist"
