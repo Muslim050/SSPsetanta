@@ -146,7 +146,7 @@ function SummaryEmpty({
 }
 
 // Лиги Live spot, пока их не выбрали.
-const DEFAULT_LIVE_LEAGUES = 'UFC / Football'
+const DEFAULT_LIVE_LEAGUES = 'UFC / Футбол'
 
 /**
  * Карточка цифры Spot. `league` — у Live spot: лиги строкой, в подписи

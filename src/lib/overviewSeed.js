@@ -156,7 +156,7 @@ export const OVERVIEW_DEFAULTS = {
     {
       id: 'lg_football',
       sport: 'Футбол',
-      leagues: 'EPL, LaLiga, Ligue 1, Bundesliga, Serie A',
+      leagues: 'АПЛ, Ла Лига, Лига 1, Бундеслига, Серия А',
       ages: [27.8, 33.3, 22.2, 16.7],
     },
     {

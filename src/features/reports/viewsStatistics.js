@@ -1,4 +1,4 @@
-import { sportName } from '@/lib/audienceOptions.js'
+import { leagueNames, sportName } from '@/lib/audienceOptions.js'
 import { cloneOverview } from '@/lib/overviewSeed.js'
 
 /**
@@ -59,7 +59,7 @@ export function audienceFromServer(stats) {
     leagueAgeRows: (stats?.leagueRows ?? []).map((row, index) => ({
       id: `lg_${index}`,
       sport: sportName(row.sport),
-      leagues: row.league,
+      leagues: leagueNames(row.league),
       ages: AGE_KEYS.map((key) => num(row.age?.[key])),
     })),
     cityShare: (stats?.geo ?? []).map((row, index) => ({

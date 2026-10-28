@@ -7,6 +7,8 @@
  * устройства и города — см. totalSummary.
  */
 
+import { leagueNames } from '@/lib/audienceOptions.js'
+
 // Каналы Spot: `channel` — канал в ручном отчёте.
 export const CHANNELS = [
   { name: 'Setanta Sports 1', code: 'S1', channel: 'ss1' },
@@ -38,8 +40,8 @@ export function spotSummary(report) {
         liveSeconds: num(spot.liveSeconds),
         liveViews: num(spot.liveViews),
         // Лиги Live spot строкой через запятую — у выходов и у секунд свои.
-        liveCountLeagues: spot.liveCountLeague ?? '',
-        liveSecondsLeagues: spot.liveSecondsLeague ?? '',
+        liveCountLeagues: leagueNames(spot.liveCountLeague),
+        liveSecondsLeagues: leagueNames(spot.liveSecondsLeague),
       }
     }),
     eventPromo: report.eventPromoCount ?? null,
