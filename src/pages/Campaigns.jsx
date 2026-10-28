@@ -1224,6 +1224,9 @@ export default function Campaigns() {
           statusByPeriod={statusByPeriod}
           period={activePeriod ?? periodKey(activeYear, new Date().getMonth())}
           years={years}
+          start={selectedContract.start}
+          end={selectedContract.end}
+          hiddenMonths={hiddenMonths}
           saving={savingPaymentStatus}
           readOnly={!canEditMoney}
           onSave={savePaymentStatus}

@@ -696,8 +696,11 @@ export default function ContractOverview() {
           statusByPeriod={paymentRow.contract.paymentStatusByPeriod ?? {}}
           period={activePeriod ?? periodKey(activeYear, new Date().getMonth())}
           years={years}
-          // Месяц выбран вкладкой — в поповере меняется только число.
-          monthLocked={activePeriod != null}
+          start={paymentRow.contract.start}
+          end={paymentRow.contract.end}
+          hiddenMonths={paymentRow.contract.hiddenMonths ?? []}
+          // Месяц выбран вкладкой — в поповере выбирают месяц, без даты.
+          monthOnly={activePeriod != null}
           saving={savingPaymentStatus}
           readOnly={!canEditMoney}
           onSave={savePaymentStatus}

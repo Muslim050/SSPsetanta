@@ -138,6 +138,20 @@ function YearRow({ year, years, onChange }) {
 }
 
 /**
+ * Метка текущего месяца — полоска снизу внутри вкладки: фон вкладки занят
+ * статусом, обводка — выбором, а полоска видна при любых из них. Вкладке
+ * нужен `relative`.
+ */
+export function NowMark() {
+  return (
+    <span
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-x-[30%] bottom-0.5 h-0.5 rounded-full bg-indigo-700"
+    />
+  )
+}
+
+/**
  * Фильтр периода: над месяцами — годы строкой (YearRow), ниже 12 месяцев.
  * Отдельной вкладки «Все» нет: фильтр снимает крестик справа (или повторный
  * клик по выбранному месяцу).
@@ -200,6 +214,7 @@ export function MonthTabs({
             const passed =
               year < currentYear ||
               (year === currentYear && month <= currentMonth)
+            const isNow = year === currentYear && month === currentMonth
             return (
               <button
                 key={label}
@@ -212,12 +227,13 @@ export function MonthTabs({
                     ? cn(
                         `${MONTHS_FULL[month]} ${year}`,
                         status && `· ${statusTitles[status]}`,
+                        isNow && '· текущий месяц',
                       )
                     : `${MONTHS_FULL[month]} ${year} — месяц ещё не наступил`
                 }
                 onClick={() => onChange(active ? null : month)}
                 className={cn(
-                  'flex shrink-0 items-center gap-1 rounded-lg px-2 py-1.5 text-[13px] font-medium transition-all focus-ring',
+                  'relative flex shrink-0 items-center gap-1 rounded-lg px-2 py-1.5 text-[13px] font-medium transition-all focus-ring',
                   passed
                     ? status
                       ? (statusFills?.[status] ?? STATUS_FILLS[status])
@@ -229,6 +245,7 @@ export function MonthTabs({
                   active && 'font-semibold ring-2 ring-indigo-700',
                 )}
               >
+                {isNow && <NowMark />}
                 {label}
                 {passed && count > 0 && (
                   <span className="rounded-full bg-black/[0.07] px-1 text-[11px] tnum">
