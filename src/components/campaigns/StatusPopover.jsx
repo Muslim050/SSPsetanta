@@ -3,7 +3,11 @@ import { createPortal } from 'react-dom'
 import { Check, ChevronLeft, ChevronRight, Loader2, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Field, Input } from '@/components/ui/Field'
-import { MONTHS_SHORT, MONTHS_FULL } from '@/components/campaigns/MonthTabs.jsx'
+import {
+  MONTHS_SHORT,
+  MONTHS_FULL,
+  NowMark,
+} from '@/components/campaigns/MonthTabs.jsx'
 import { formatDateTime } from '@/lib/format.js'
 import { cn } from '@/lib/cn.js'
 import { usePopoverPlacement } from '@/lib/usePopoverPlacement.js'
@@ -344,6 +348,9 @@ export function StatusPopover({
                 // Месяцев вне срока и скрытых в договоре в выборе нет.
                 if (!isOpen(year, index)) return null
                 const active = index === month
+                const isNow =
+                  year === new Date().getFullYear() &&
+                  index === new Date().getMonth()
                 // У месяца уже есть статус — показываем точкой, какой именно.
                 const saved = statusByPeriod[periodKey(year, index)]?.status
                 return (
@@ -351,14 +358,18 @@ export function StatusPopover({
                     key={label}
                     type="button"
                     onClick={() => pickMonth(year, index)}
-                    title={`${MONTHS_FULL[index]} ${year}`}
+                    title={cn(
+                      `${MONTHS_FULL[index]} ${year}`,
+                      isNow && '· текущий месяц',
+                    )}
                     className={cn(
-                      'flex items-center justify-center gap-1 rounded-lg border px-1 py-1.5 text-[12px] font-medium transition-colors focus-ring',
+                      'relative flex items-center justify-center gap-1 rounded-lg border px-1 py-1.5 text-[12px] font-medium transition-colors focus-ring',
                       active
                         ? 'border-indigo-400 bg-indigo-50 text-ink'
                         : 'border-line bg-surface text-ink-soft hover:border-indigo-200 hover:bg-indigo-50/50',
                     )}
                   >
+                    {isNow && <NowMark />}
                     {label}
                     {saved && (
                       <span
