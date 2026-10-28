@@ -35,6 +35,7 @@ import {
 import { TotalStatisticsReport } from '@/components/campaigns/CampaignReportPanels.jsx'
 import { AdvertiserPicker } from '@/components/campaigns/AdvertiserPicker.jsx'
 import { SegmentTabs } from '@/components/ui/Tabs.jsx'
+import { MonthTabs } from '@/components/campaigns/MonthTabs.jsx'
 import { useToast } from '@/components/ui/Toast.jsx'
 import { useConfirm } from '@/components/ui/Confirm.jsx'
 import { formatNumber, formatShare } from '@/lib/format.js'
@@ -798,42 +799,48 @@ export default function Dashboard() {
   // Правки копим в черновике: «Отмена» возвращает сохранённые данные.
   const [draft, setDraft] = useState(null)
 
-  // Период — как у рекламодателя: год и «от и до». Сменили его —
-  // черновик прошлого периода за собой не тащим.
+  // Разделы обзора разведены по вкладкам: цифр много, на одной странице
+  // они не читаются. Первой — общая статистика.
+  const [tab, setTab] = useState('total')
+
+  // Общая статистика — за период «от и до», как у рекламодателя. Аудитория
+  // и YouTube ведутся помесячно, у них свой выбор одного месяца (месяц в
+  // нём всегда один: пользуемся только pickMonth и pickYear). Сменили
+  // период — черновик прошлого за собой не тащим.
   const range = useMonthRange({ onChange: () => setDraft(null) })
-  // Аудитория и YouTube ведутся помесячно: они есть, только когда период —
-  // ровно один месяц.
-  const period = range.month != null ? periodOf(range.year, range.month) : null
-  const overview = overviewFor(period ?? range.to)
-  const monthLabel = range.label
+  const single = useMonthRange({ onChange: () => setDraft(null) })
+  const period = periodOf(single.year, single.month)
+  const overview = overviewFor(period)
+  const monthLabel = tab === 'total' ? range.label : single.label
   // Рекламодатель для итогов в шапке; пусто — все.
   const { data: advertisers = [] } = useAdvertisers()
   const [advertiserId, setAdvertiserId] = useState('')
-  // Статистика за период — с сервера одним запросом (см. usePeriodTotals):
-  // итоги в шапке и, когда месяц один, разделы аудитории.
+  // Итоги общей статистики за период — с сервера одним запросом (см.
+  // usePeriodTotals).
   const header = usePeriodTotals({
     from: range.from,
     to: range.to,
     advertiserId: advertiserId ? Number(advertiserId) : null,
   })
+  // Разделы аудитории — доли выбранного месяца, одни на все договоры: от
+  // выбора рекламодателя не зависят.
+  const monthly = usePeriodTotals({
+    from: period,
+    to: period,
+    advertiserId: null,
+  })
 
-  // Разделы аудитории — доли месяца из того же ответа (одни на все договоры,
-  // от выбора рекламодателя не зависят). YouTube пока живёт демо-данными в
-  // браузере.
+  // YouTube пока живёт демо-данными в браузере.
   const { mutate: saveViews, isPending: savingViews } = useSaveViewsStatistics()
   const audience = useMemo(
-    () => (period && header.stats ? audienceFromServer(header.stats) : null),
-    [period, header.stats],
+    () => (monthly.stats ? audienceFromServer(monthly.stats) : null),
+    [monthly.stats],
   )
-  const viewsLoading = header.loading
+  const viewsLoading = monthly.loading
   const canEditPage = canEdit && !isAdvertiser
   const emptyText = canEditPage
     ? 'Не введено — нажмите «Редактировать»'
     : `За ${monthLabel} не введено`
-
-  // Разделы обзора разведены по вкладкам: цифр много, на одной странице
-  // они не читаются. Первой — общая статистика.
-  const [tab, setTab] = useState('total')
 
   // Разделы аудитории на входе в правку: не меняли — на сервер не шлём, иначе
   // правка одного YouTube записала бы месяцу нули вместо «не введено».
@@ -936,9 +943,8 @@ export default function Dashboard() {
               <Button
                 variant="primary"
                 onClick={startEditing}
-                // Правка — за один месяц и с его данными: без них не с чего.
-                disabled={!period || !audience}
-                title={period ? undefined : 'Править можно один месяц'}
+                // Правка — с данными месяца: без них не с чего.
+                disabled={!audience}
               >
                 <Pencil size={16} />
                 Редактировать
@@ -947,9 +953,9 @@ export default function Dashboard() {
           ))}
       </PageHeader>
 
-      {/* Вкладки и период — одной строкой: период общий для всех вкладок,
-          поэтому рядом с ними, а не в карточке общей статистики. На узком
-          экране период переносится под вкладки. */}
+      {/* Вкладки и период — одной строкой: у общей статистики период «от
+          и до», у помесячных разделов — лента месяцев. На узком экране
+          период переносится под вкладки. */}
       <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
         <SegmentTabs
           items={[
@@ -960,7 +966,19 @@ export default function Dashboard() {
           value={tab}
           onChange={setTab}
         />
-        <PeriodPicker period={range} />
+        {tab === 'total' ? (
+          <PeriodPicker period={range} />
+        ) : (
+          <MonthTabs
+            year={single.year}
+            years={single.years}
+            onYearChange={single.pickYear}
+            value={single.month}
+            onChange={single.pickMonth}
+            // Месяц обязателен, поэтому сброс возвращает к текущему.
+            resetLabel="Вернуться к текущему месяцу"
+          />
+        )}
       </div>
 
       {tab === 'total' ? (
@@ -982,8 +1000,6 @@ export default function Dashboard() {
             />
           }
         />
-      ) : !period ? (
-        <NotEntered text="Возраст, устройства, лиги, города и YouTube ведутся по месяцам — выберите период в один месяц." />
       ) : tab === 'media' ? (
         <>
           {viewsLoading ? (
@@ -992,7 +1008,7 @@ export default function Dashboard() {
               label={`Загружаем статистику за ${monthLabel}…`}
               className="min-h-0 py-8 sm:min-h-0"
             />
-          ) : header.error ? (
+          ) : monthly.error ? (
             <NotEntered
               text="Не удалось загрузить статистику просмотров — обновите страницу."
               className="mt-6"
