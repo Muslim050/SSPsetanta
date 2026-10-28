@@ -167,7 +167,7 @@ function RemoveRow({ label, onClick }) {
 // Колонки возраста в таблице лиг — в порядке AGE_KEYS, без 13–17
 // (значение группы остаётся в row.ages и уходит на сервер как было).
 const AGE_COLUMNS = AGE_KEYS.flatMap((key, index) =>
-  key === '13-17' ? [] : [{ index, label: `${key.replace('-', '–')} y.o.` }],
+  key === '13-17' ? [] : [{ index, label: key.replace('-', '–') }],
 )
 
 function AudienceAgeReport({ data, editing, patch, emptyText }) {
