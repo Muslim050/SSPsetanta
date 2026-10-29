@@ -78,6 +78,14 @@ export const CONTRACT_PAYMENT = {
     pencil: 'text-danger',
     pulse: true,
   },
+  partial: {
+    label: 'Частично оплачено',
+    card: 'border-warning/45 bg-warning/[0.08] hover:border-warning/60 hover:bg-warning/10',
+    badge: 'bg-warning/15 text-warning',
+    caption: 'text-warning',
+    pencil: 'text-warning',
+    pulse: false,
+  },
   paid: {
     label: 'Оплачено',
     card: 'border-success/35 bg-success/[0.07] hover:border-success/60 hover:bg-success/10',
@@ -102,25 +110,45 @@ export const PAYMENT_NONE = {
 }
 
 /**
- * Статус оплаты с сервера → оформление: `paid` — зелёный, пусто — без
- * подсветки (null), любое другое значение — красный «ожидает оплату».
+ * Статус оплаты с сервера → оформление: `paid` — зелёный, `partial` —
+ * оранжевый, пусто — без подсветки (null), любое другое значение —
+ * красный «ожидает оплату».
  */
 export function paymentTone(status) {
   if (!status) return null
-  return status === 'paid' ? 'paid' : 'awaiting'
+  return status === 'paid' || status === 'partial' ? status : 'awaiting'
 }
 
-/** Варианты для поповера смены статуса оплаты. */
+/**
+ * Общий статус нескольких договоров за месяц: хоть один ждёт оплату —
+ * ждёт, иначе хоть один оплачен частично — частично, иначе оплачено.
+ * tones — уже из paymentTone, без пустых.
+ */
+export function worstPaymentTone(tones) {
+  if (!tones.length) return null
+  if (tones.includes('awaiting')) return 'awaiting'
+  return tones.includes('partial') ? 'partial' : 'paid'
+}
+
+/** Варианты для поповера смены статуса оплаты; dot — точка у месяца. */
 export const PAYMENT_OPTIONS = [
   {
     value: 'awaiting',
     label: CONTRACT_PAYMENT.awaiting.label,
     badge: CONTRACT_PAYMENT.awaiting.badge,
+    dot: 'bg-danger',
+  },
+  {
+    value: 'partial',
+    label: CONTRACT_PAYMENT.partial.label,
+    badge: CONTRACT_PAYMENT.partial.badge,
+    dot: 'bg-warning',
   },
   {
     value: 'paid',
     label: CONTRACT_PAYMENT.paid.label,
     badge: CONTRACT_PAYMENT.paid.badge,
+    dot: 'bg-success',
   },
 ]
 

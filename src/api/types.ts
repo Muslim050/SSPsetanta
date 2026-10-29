@@ -49,8 +49,11 @@ export interface Paginated<T> {
 export type AdvertiserStatus = 'active' | 'paused'
 export type ContractPackage = 'partner' | 'general' | 'presenter'
 export type ContractStatus = 'active' | 'completed' | 'terminated'
-/** Пустая строка — статус за период ещё не ставили. */
-export type PaymentStatus = 'awaiting' | 'paid' | ''
+/**
+ * Статус оплаты за месяц: ожидает оплату, частично оплачено, оплачено.
+ * Пустая строка — статус за период ещё не ставили.
+ */
+export type PaymentStatus = 'awaiting' | 'partial' | 'paid' | ''
 
 /** Файл внутри сущности: скан договора, ролик. Только на чтение. */
 export interface AttachedFile {

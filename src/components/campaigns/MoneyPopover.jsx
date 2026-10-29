@@ -1,14 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import {
-  Check,
-  ChevronDown,
-  Loader2,
-  Pencil,
-  Plus,
-  Trash2,
-  X,
-} from 'lucide-react'
+import { Check, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useAuth } from '@/features/auth/useAuth'
 import {
   formatDateTime,
@@ -18,6 +10,7 @@ import {
 } from '@/lib/format.js'
 import { Button } from '@/components/ui/Button'
 import { DateTimePicker } from '@/components/ui/DateTimePicker.jsx'
+import { ExpandableComment } from '@/components/ui/ExpandableComment.jsx'
 import { Field, Input } from '@/components/ui/Field'
 import { cn } from '@/lib/cn.js'
 import { usePopoverPlacement } from '@/lib/usePopoverPlacement.js'
@@ -82,54 +75,6 @@ const toDecimal = (field) => {
   const digits = onlyDigits(whole).replace(/^0+(?=\d)/, '') || '0'
   const cents = onlyDigits(fraction).replace(/0+$/, '')
   return cents ? `${digits}.${cents}` : digits
-}
-
-/**
- * Комментарий к выплате: одна строка с многоточием, а если не влез —
- * раскрывается по клику целиком и сворачивается обратно.
- */
-function PaymentComment({ text }) {
-  const [expanded, setExpanded] = useState(false)
-  // Обрезан ли текст многоточием — меряем, пока он свёрнут.
-  const [clipped, setClipped] = useState(false)
-  const measure = (el) => {
-    if (el && !expanded) setClipped(el.scrollWidth > el.clientWidth)
-  }
-
-  if (!clipped && !expanded) {
-    return (
-      <p ref={measure} className="truncate text-[11px] text-ink-muted">
-        {text}
-      </p>
-    )
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={() => setExpanded((value) => !value)}
-      aria-expanded={expanded}
-      title={expanded ? 'Свернуть комментарий' : 'Показать комментарий целиком'}
-      className="flex w-full min-w-0 items-start gap-1 rounded text-left text-[11px] text-ink-muted transition-colors hover:text-ink-soft focus-ring"
-    >
-      <span
-        ref={measure}
-        className={cn(
-          'min-w-0 flex-1',
-          expanded ? 'whitespace-pre-wrap break-words' : 'truncate',
-        )}
-      >
-        {text}
-      </span>
-      <ChevronDown
-        size={12}
-        className={cn(
-          'mt-0.5 shrink-0 transition-transform',
-          expanded && 'rotate-180',
-        )}
-      />
-    </button>
-  )
 }
 
 /**
@@ -301,7 +246,7 @@ export function PaymentRow({
         {label && <p className="truncate text-[11px] text-ink-soft">{label}</p>}
         {/* key: после правки комментарий снова свёрнут и перемерен. */}
         {savedComment && (
-          <PaymentComment key={savedComment} text={savedComment} />
+          <ExpandableComment key={savedComment} text={savedComment} />
         )}
       </div>
       <span className="shrink-0 text-[13px] font-semibold text-emerald-700 tnum">
@@ -365,6 +310,7 @@ export function MoneyPopover({
   const [paid, setPaid] = useState(amountField(spent))
   const [income, setIncome] = useState('')
   const [paidAt, setPaidAt] = useState(() => toDateTimeInput(new Date()))
+  const [comment, setComment] = useState('')
 
   // Поповер остаётся открытым после сохранения — подтягиваем свежие суммы.
   useEffect(() => {
@@ -448,6 +394,7 @@ export function MoneyPopover({
       amount: numbers.income,
       // Дату и время поступления выбирает пользователь.
       paidAt: new Date(paidAt).toISOString(),
+      comment: comment.trim(),
     })
     // Поле поступления не чистим: после сохранения поповер закрывается,
     // а при ошибке сумма нужна для повтора.
@@ -576,6 +523,15 @@ export function MoneyPopover({
               <DateTimePicker
                 value={paidAt}
                 onChange={setPaidAt}
+                className="h-9 text-[13px]"
+              />
+            </Field>
+
+            <Field label="Комментарий">
+              <Input
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                placeholder="Необязательно"
                 className="h-9 text-[13px]"
               />
             </Field>

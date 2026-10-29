@@ -30,6 +30,7 @@ import {
   CONTRACT_STATUS,
   PAYMENT_OPTIONS,
   paymentTone,
+  worstPaymentTone,
 } from '@/lib/metrics.js'
 import {
   formatDateNumeric,
@@ -52,6 +53,7 @@ import {
   PaymentRow,
 } from '@/components/campaigns/MoneyPopover.jsx'
 import { usePaymentActions } from '@/components/campaigns/usePaymentActions.js'
+import { useStatusActions } from '@/components/campaigns/useStatusActions.js'
 import { MonthTabs, MONTHS_FULL } from '@/components/campaigns/MonthTabs.jsx'
 import {
   StatusPopover,
@@ -66,23 +68,36 @@ const MONTHS = Array.from({ length: 12 }, (_, i) => i)
 // в кампаниях подпись прежняя.
 const PAYMENT_LABELS = {
   awaiting: 'В процессе',
+  partial: CONTRACT_PAYMENT.partial.label,
   paid: CONTRACT_PAYMENT.paid.label,
 }
-// «В процессе» здесь оранжевый, а не красный.
+// «В процессе» здесь оранжевый, а не красный, — поэтому «Частично
+// оплачено», оранжевое в кампаниях, здесь голубое.
 const PAYMENT_BADGES = {
   awaiting: 'bg-warning/20 text-warning',
+  partial: 'bg-sky-500/15 text-sky-700',
   paid: CONTRACT_PAYMENT.paid.badge,
+}
+const PAYMENT_DOTS = {
+  awaiting: 'bg-warning',
+  partial: 'bg-sky-500',
+  paid: 'bg-success',
 }
 const STATUS_OPTIONS = PAYMENT_OPTIONS.map((option) => ({
   ...option,
   label: PAYMENT_LABELS[option.value],
   badge: PAYMENT_BADGES[option.value],
-  dot: option.value === 'paid' ? 'bg-success' : 'bg-warning',
+  dot: PAYMENT_DOTS[option.value],
 }))
 // Подсказки и цвет вкладок месяцев.
-const MONTH_STATUS_TITLES = { paid: 'оплачен', awaiting: 'в процессе' }
+const MONTH_STATUS_TITLES = {
+  paid: 'оплачен',
+  partial: 'оплачен частично',
+  awaiting: 'в процессе',
+}
 const MONTH_STATUS_FILLS = {
   awaiting: 'bg-warning/25 font-semibold text-warning hover:bg-warning/35',
+  partial: 'bg-sky-500/20 font-semibold text-sky-700 hover:bg-sky-500/30',
 }
 
 /** Границы месяца в ISO — с ними и сравниваем срок договора. */
@@ -153,6 +168,7 @@ export default function ContractOverview() {
   const { mutate: savePaymentStatusFor, isPending: savingPaymentStatus } =
     useSetPaymentStatus()
   const { editPayment, removePayment } = usePaymentActions()
+  const { editStatusEntry, removeStatusEntry } = useStatusActions()
   const toast = useToast()
   const [q, setQ] = useState('')
   const [year, setYear] = useState(() => new Date().getFullYear())
@@ -212,7 +228,8 @@ export default function ContractOverview() {
       rows.filter(({ contract }) => inMonth(contract, activeYear, m)).length,
   )
 
-  // Цвет месяца: красный, если хоть один договор за него не оплачен.
+  // Цвет месяца: «в процессе», если хоть один договор за него не оплачен,
+  // иначе «частично», если хоть один оплачен не до конца.
   const monthStatuses = MONTHS.reduce((acc, m) => {
     const period = periodKey(activeYear, m)
     const statuses = rows
@@ -221,9 +238,8 @@ export default function ContractOverview() {
         paymentTone(contract.paymentStatusByPeriod?.[period]?.status),
       )
       .filter(Boolean)
-    if (statuses.length) {
-      acc[m] = statuses.includes('awaiting') ? 'awaiting' : 'paid'
-    }
+    const tone = worstPaymentTone(statuses)
+    if (tone) acc[m] = tone
     return acc
   }, {})
 
@@ -299,13 +315,13 @@ export default function ContractOverview() {
    * Суммы договора. Разовое поступление уходит отдельным платежом, ручная
    * правка «Оплачено» — правкой сумм (см. useSaveContractMoney).
    */
-  const saveMoney = ({ budget, spent, amount, paidAt }) => {
+  const saveMoney = ({ budget, spent, amount, paidAt, comment }) => {
     const contract = moneyContract
     if (!contract) return
     const gained = spent - toNumber(contract.spent)
 
     saveContractMoney(
-      { contract, money: { budget, spent, amount, paidAt } },
+      { contract, money: { budget, spent, amount, paidAt, comment } },
       {
         // Сохранили — закрываем поповер; при ошибке он остаётся с суммами.
         onSuccess: () => {
@@ -704,6 +720,16 @@ export default function ContractOverview() {
           saving={savingPaymentStatus}
           readOnly={!canEditMoney}
           onSave={savePaymentStatus}
+          onEditEntry={(entryId, input) =>
+            editStatusEntry(paymentRow.contract, entryId, input)
+          }
+          onRemoveEntry={(entry) =>
+            removeStatusEntry(
+              paymentRow.contract,
+              entry,
+              PAYMENT_LABELS[paymentTone(entry.status) ?? 'awaiting'],
+            )
+          }
           onClose={() => setPaymentAnchor(null)}
         />
       )}

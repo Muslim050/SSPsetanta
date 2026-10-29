@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, ChevronLeft, ChevronRight, Loader2, X } from 'lucide-react'
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  Pencil,
+  Trash2,
+  X,
+} from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { DateTimePicker } from '@/components/ui/DateTimePicker.jsx'
 import { Field } from '@/components/ui/Field'
@@ -14,6 +22,9 @@ import { cn } from '@/lib/cn.js'
 import { usePopoverPlacement } from '@/lib/usePopoverPlacement.js'
 
 const WIDTH = 300
+
+const entryButton =
+  'rounded-md p-1 text-ink-muted transition-colors focus-ring disabled:opacity-50'
 
 const pad = (n) => String(n).padStart(2, '0')
 
@@ -61,6 +72,10 @@ const parsePeriod = (period) => {
  * monthOnly — дату смены не выбирают, только месяц: дата — сегодняшнее
  *   число и время, перенесённые в этот месяц.
  * saving — запрос ещё идёт: на кнопке загрузка, повторно не отправляем.
+ * onEditEntry(entryId, { status?, period?, changedAt? }) → Promise<boolean>
+ *   — правка записи истории (только изменённые поля); true — сохранили.
+ *   Запись правят той же формой, что и ставят статус.
+ * onRemoveEntry(entry) — удалить запись истории.
  */
 export function StatusPopover({
   anchorEl,
@@ -78,6 +93,8 @@ export function StatusPopover({
   saving = false,
   readOnly = false,
   onSave,
+  onEditEntry,
+  onRemoveEntry,
   onClose,
 }) {
   const ref = useRef(null)
@@ -123,6 +140,38 @@ export function StatusPopover({
   )
   const [year, setYear] = useState(initial.year)
   const [month, setMonth] = useState(initial.month)
+  // Запись истории, которую правят формой вкладки «Статус»; null — форма
+  // ставит новый статус.
+  const [editingEntry, setEditingEntry] = useState(null)
+  const [entrySaving, setEntrySaving] = useState(false)
+  const entryChangedAt = editingEntry
+    ? toDateTimeInput(new Date(editingEntry.changedAt))
+    : null
+
+  /** Форма — под правку записи: её статус, месяц и дата смены. */
+  const startEdit = (entry) => {
+    const at = parsePeriod(entry.period) ?? initial
+    setEditingEntry(entry)
+    setDraft(entry.status)
+    setYear(at.year)
+    setMonth(at.month)
+    setChangedAt(toDateTimeInput(new Date(entry.changedAt)))
+    setTab('status')
+  }
+
+  /** Правку бросили или сохранили — форма снова ставит новый статус. */
+  const stopEdit = () => {
+    setEditingEntry(null)
+    setDraft(value)
+    setYear(initial.year)
+    setMonth(initial.month)
+    setChangedAt(
+      monthOnly
+        ? moveToMonth(null, initial.year, initial.month)
+        : toDateTimeInput(new Date()),
+    )
+    setTab('history')
+  }
 
   // Месяц и дата смены ходят парой: выбрали апрель — дата уезжает в апрель,
   // поправили дату руками — подсвечивается её месяц.
@@ -188,10 +237,30 @@ export function StatusPopover({
   const blocked = !changedAt || !isOpen(year, month)
 
   // Тот же статус сохранить можно: так переносят дату смены.
-  const save = () => {
-    if (saving || blocked) return
-    onSave(draft, new Date(changedAt).toISOString(), selectedPeriod)
+  const save = async () => {
+    if (saving || entrySaving || blocked) return
+    if (!editingEntry) {
+      onSave(draft, new Date(changedAt).toISOString(), selectedPeriod)
+      return
+    }
+
+    // Запись правим только изменёнными полями. Дату не трогали — не шлём:
+    // поле с точностью до минуты, секунды смены обнулились бы молча.
+    const input = {}
+    if (draft !== editingEntry.status) input.status = draft
+    if (selectedPeriod !== editingEntry.period) input.period = selectedPeriod
+    if (changedAt !== entryChangedAt) {
+      input.changedAt = new Date(changedAt).toISOString()
+    }
+    if (!Object.keys(input).length) return stopEdit()
+
+    setEntrySaving(true)
+    const ok = await onEditEntry(editingEntry.id, input)
+    setEntrySaving(false)
+    // Ошибка — остаёмся в правке, выбранное не теряется.
+    if (ok) stopEdit()
   }
+  const busy = saving || entrySaving
 
   // Прижимаем к левому краю карточки, но не даём уехать за экран.
   const left = Math.min(
@@ -249,7 +318,7 @@ export function StatusPopover({
             className={tabClass('status')}
             onClick={() => setTab('status')}
           >
-            Статус
+            {editingEntry ? 'Правка' : 'Статус'}
           </button>
           <button
             type="button"
@@ -275,6 +344,26 @@ export function StatusPopover({
 
       {tab === 'status' && !readOnly ? (
         <>
+          {editingEntry && (
+            <div className="mt-3 flex items-center gap-2 rounded-xl bg-indigo-50 px-3 py-2 text-[12px] text-ink-soft">
+              <Pencil size={13} className="shrink-0 text-indigo-800" />
+              <span className="min-w-0 flex-1">
+                Правка записи от{' '}
+                <span className="font-medium text-ink tnum">
+                  {formatDateTime(editingEntry.changedAt)}
+                </span>
+              </span>
+              <button
+                type="button"
+                onClick={stopEdit}
+                disabled={entrySaving}
+                className="shrink-0 rounded-lg px-1.5 py-0.5 font-medium text-ink-muted transition-colors hover:bg-ink/6 hover:text-ink focus-ring"
+              >
+                Отменить
+              </button>
+            </div>
+          )}
+
           <div className="mt-3 space-y-1.5">
             {options.map((option) => {
               const active = option.value === draft
@@ -301,7 +390,8 @@ export function StatusPopover({
             })}
           </div>
 
-          {!monthOnly && (
+          {/* У записи дату правят всегда: это одно из её полей. */}
+          {(!monthOnly || editingEntry) && (
             <div className="mt-3">
               <Field label="Дата изменения">
                 <DateTimePicker
@@ -375,8 +465,7 @@ export function StatusPopover({
                       <span
                         className={cn(
                           'h-1.5 w-1.5 shrink-0 rounded-full',
-                          byValue[saved]?.dot ??
-                            (saved === 'paid' ? 'bg-success' : 'bg-danger'),
+                          byValue[saved]?.dot ?? 'bg-danger',
                         )}
                       />
                     )}
@@ -402,9 +491,9 @@ export function StatusPopover({
               size="sm"
               className="flex-1"
               onClick={save}
-              disabled={saving || blocked}
+              disabled={busy || blocked}
             >
-              {saving ? (
+              {busy ? (
                 <>
                   <Loader2 size={14} className="animate-spin" />
                   Сохраняем…
@@ -413,7 +502,12 @@ export function StatusPopover({
                 'Сохранить'
               )}
             </Button>
-            <Button size="sm" variant="secondary" onClick={onClose}>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={editingEntry ? stopEdit : onClose}
+              disabled={entrySaving}
+            >
               Отмена
             </Button>
           </div>
@@ -428,36 +522,74 @@ export function StatusPopover({
           ) : (
             history.map((entry) => {
               const at = parsePeriod(entry.period)
+              const editable = !readOnly && (onEditEntry || onRemoveEntry)
               return (
                 <div
                   key={entry.id}
-                  className="rounded-xl bg-paper/70 px-2.5 py-1.5"
+                  className={cn(
+                    'flex items-center gap-1.5 rounded-xl bg-paper/70 px-2.5 py-1.5',
+                    editingEntry?.id === entry.id && 'ring-2 ring-indigo-300',
+                  )}
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-medium text-ink">
-                      {at
-                        ? `${MONTHS_FULL[at.month]} ${at.year}`
-                        : 'Без месяца'}
-                    </span>
-                    <span
-                      className={cn(
-                        'shrink-0 rounded-full px-1.5 text-[10px] font-medium',
-                        byValue[entry.status]?.badge,
-                      )}
-                    >
-                      {byValue[entry.status]?.label ?? entry.status}
-                    </span>
-                  </div>
-                  <div className="mt-0.5 flex items-center justify-between gap-2">
-                    <span className="text-[10px] text-ink-muted tnum">
-                      {formatDateTime(entry.changedAt ?? entry.createdAt)}
-                    </span>
-                    {entry.by && (
-                      <span className="truncate text-[10px] text-ink-muted">
-                        {entry.by}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-medium text-ink">
+                        {at
+                          ? `${MONTHS_FULL[at.month]} ${at.year}`
+                          : 'Без месяца'}
                       </span>
-                    )}
+                      <span
+                        className={cn(
+                          'shrink-0 rounded-full px-1.5 text-[10px] font-medium',
+                          byValue[entry.status]?.badge,
+                        )}
+                      >
+                        {byValue[entry.status]?.label ?? entry.status}
+                      </span>
+                    </div>
+                    <div className="mt-0.5 flex items-center justify-between gap-2">
+                      <span className="text-[10px] text-ink-muted tnum">
+                        {formatDateTime(entry.changedAt ?? entry.createdAt)}
+                      </span>
+                      {entry.by && (
+                        <span className="truncate text-[10px] text-ink-muted">
+                          {entry.by}
+                        </span>
+                      )}
+                    </div>
                   </div>
+                  {editable && (
+                    <div className="flex shrink-0 flex-col">
+                      {onEditEntry && (
+                        <button
+                          type="button"
+                          onClick={() => startEdit(entry)}
+                          aria-label="Изменить запись"
+                          title="Изменить статус, месяц и дату"
+                          className={cn(
+                            entryButton,
+                            'hover:bg-ink/6 hover:text-indigo-800',
+                          )}
+                        >
+                          <Pencil size={12} />
+                        </button>
+                      )}
+                      {onRemoveEntry && (
+                        <button
+                          type="button"
+                          onClick={() => onRemoveEntry(entry)}
+                          aria-label="Удалить запись"
+                          title="Удалить запись"
+                          className={cn(
+                            entryButton,
+                            'hover:bg-danger/10 hover:text-danger',
+                          )}
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               )
             })

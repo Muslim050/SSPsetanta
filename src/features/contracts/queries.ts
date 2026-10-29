@@ -211,6 +211,8 @@ export interface ContractMoney {
   /** Разовое поступление; 0 — его нет. */
   amount: number
   paidAt: string
+  /** Комментарий к поступлению; пусто — без комментария. */
+  comment?: string
 }
 
 /**
@@ -239,11 +241,25 @@ export function useSaveContractMoney() {
         money.amount > 0 && money.spent - money.amount === spentBefore
 
       if (!onlyIncome) {
-        await contractsApi.updateAmounts(contract.id, {
+        const updated = await contractsApi.updateAmounts(contract.id, {
           budget: String(money.budget),
           spent: String(money.spent),
           paidAt: money.paidAt,
         })
+        // Комментария у правки сумм нет: прирост «Оплачено» сервер оформил
+        // поступлением — дописываем комментарий ему, самому свежему.
+        if (money.comment && money.spent > spentBefore) {
+          const created = (updated.payments ?? []).reduce<Payment | null>(
+            (last, payment) =>
+              !last || payment.seq > last.seq ? payment : last,
+            null,
+          )
+          if (created) {
+            await contractsApi.payments.update(contract.id, created.id, {
+              comment: money.comment,
+            })
+          }
+        }
         return
       }
 
@@ -258,7 +274,11 @@ export function useSaveContractMoney() {
       }
       await contractsApi.payments.create(
         contract.id,
-        { amount: String(money.amount), paidAt: money.paidAt },
+        {
+          amount: String(money.amount),
+          paidAt: money.paidAt,
+          ...(money.comment ? { comment: money.comment } : {}),
+        },
         pending.current.key,
       )
       pending.current = null
@@ -270,7 +290,10 @@ export function useSaveContractMoney() {
   })
 }
 
-/** Статус оплаты за месяц договора: «ожидает оплату» / «оплачено». */
+/**
+ * Статус оплаты за месяц договора: «ожидает оплату», «частично оплачено»
+ * или «оплачено».
+ */
 export function useSetPaymentStatus() {
   const client = useQueryClient()
 
@@ -282,6 +305,44 @@ export function useSetPaymentStatus() {
       id: number
       input: contractsApi.PaymentStatusInput
     }) => contractsApi.setPaymentStatus(id, input),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: advertiserKeys.all })
+    },
+  })
+}
+
+/** Правка записи истории статусов оплаты: статус, месяц и/или дата смены. */
+export function useUpdateStatusEntry() {
+  const client = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      contractId,
+      entryId,
+      input,
+    }: {
+      contractId: number
+      entryId: number
+      input: Partial<contractsApi.PaymentStatusInput>
+    }) => contractsApi.statusEntries.update(contractId, entryId, input),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: advertiserKeys.all })
+    },
+  })
+}
+
+/** Удаление записи истории статусов: статус месяца сервер откатывает сам. */
+export function useDeleteStatusEntry() {
+  const client = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      contractId,
+      entryId,
+    }: {
+      contractId: number
+      entryId: number
+    }) => contractsApi.statusEntries.remove(contractId, entryId),
     onSuccess: () => {
       client.invalidateQueries({ queryKey: advertiserKeys.all })
     },
