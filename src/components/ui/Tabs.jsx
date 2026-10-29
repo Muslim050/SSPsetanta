@@ -10,9 +10,12 @@ const TONES = {
   soft: 'bg-indigo-100 ring-1 ring-inset ring-indigo-300',
 }
 
-// Заливка вкладки статусом: зелёная — оплачено, красная — ждёт денег.
+// Заливка вкладки статусом: зелёная — оплачено, оранжевая — оплачено
+// частично, красная — ждёт денег.
 const STATUS_TONES = {
   paid: 'bg-success/10 text-success ring-1 ring-inset ring-success/25 hover:bg-success/15',
+  partial:
+    'bg-warning/10 text-warning ring-1 ring-inset ring-warning/25 hover:bg-warning/15',
   awaiting:
     'bg-danger/10 text-danger ring-1 ring-inset ring-danger/25 hover:bg-danger/15',
 }
@@ -24,6 +27,10 @@ const STATUS_ACTIVE = {
     pill: 'bg-success/20 ring-2 ring-inset ring-success/50',
     text: 'text-success',
   },
+  partial: {
+    pill: 'bg-warning/15 ring-2 ring-inset ring-warning/45',
+    text: 'text-warning',
+  },
   awaiting: {
     pill: 'bg-danger/15 ring-2 ring-inset ring-danger/45',
     text: 'text-danger',
@@ -33,7 +40,7 @@ const STATUS_ACTIVE = {
 /**
  * Сегментированный переключатель.
  * items: [{ value, label, count?, status?, statusHint?, tooltip? }], value,
- * onChange, tone: accent | soft. `status` (paid | awaiting) красит вкладку в
+ * onChange, tone: accent | soft. `status` (paid | partial | awaiting) красит вкладку в
  * цвет статуса, `statusHint` объясняет её состояние словами — цвет один смысл
  * нести не может, и он же остаётся подсказкой у вкладок без заливки.
  * `tooltip` — своя подсказка вместо «подпись — статус»; скринридер статус

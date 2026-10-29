@@ -55,6 +55,7 @@ import { MonthTabs, MONTHS_FULL } from '@/components/campaigns/MonthTabs.jsx'
 import { MediaReport } from '@/components/campaigns/MediaReport.jsx'
 import { MoneyPopover } from '@/components/campaigns/MoneyPopover.jsx'
 import { usePaymentActions } from '@/components/campaigns/usePaymentActions.js'
+import { useStatusActions } from '@/components/campaigns/useStatusActions.js'
 import { ContractModal } from '@/components/campaigns/ContractModal.jsx'
 import {
   StatusPopover,
@@ -250,6 +251,7 @@ export default function Campaigns() {
   const { mutate: savePaymentStatusFor, isPending: savingPaymentStatus } =
     useSetPaymentStatus()
   const { editPayment, removePayment } = usePaymentActions()
+  const { editStatusEntry, removeStatusEntry } = useStatusActions()
   const toast = useToast()
 
   const [q, setQ] = useState('')
@@ -501,7 +503,7 @@ export default function Campaigns() {
    * Суммы договора. Разовое поступление уходит отдельным платежом, ручная
    * правка «Оплачено» — правкой сумм (см. useSaveContractMoney).
    */
-  const saveMoney = ({ budget, spent, amount, paidAt }) => {
+  const saveMoney = ({ budget, spent, amount, paidAt, comment }) => {
     if (!moneyContract) return
     const gained = spent - toNumber(moneyContract.spent)
     const number = moneyContract.number
@@ -509,7 +511,7 @@ export default function Campaigns() {
     saveContractMoney(
       {
         contract: moneyContract,
-        money: { budget, spent, amount, paidAt },
+        money: { budget, spent, amount, paidAt, comment },
       },
       {
         // Сохранили — закрываем поповер; при ошибке он остаётся с суммами.
@@ -555,8 +557,8 @@ export default function Campaigns() {
   /**
    * Вкладки договоров красим статусом оплаты: статус берём тот же, что
    * покажет карточка после выбора, — месяца, если он открыт, иначе
-   * договора. Оплаченный — зелёный, ждёт денег — красный, без статуса —
-   * обычный жёлтый выбор.
+   * договора. Оплаченный — зелёный, оплаченный частично — оранжевый, ждёт
+   * денег — красный, без статуса — обычный жёлтый выбор.
    */
   const contractTabs = contracts.map((item) => {
     const tone = paymentTone(
@@ -566,12 +568,7 @@ export default function Campaigns() {
     return {
       ...item,
       status: tone ?? undefined,
-      statusHint:
-        tone === 'paid'
-          ? 'оплачен'
-          : tone === 'awaiting'
-            ? 'ожидает оплату'
-            : undefined,
+      statusHint: tone ? CONTRACT_PAYMENT[tone].label.toLowerCase() : undefined,
     }
   })
 
@@ -1230,6 +1227,16 @@ export default function Campaigns() {
           saving={savingPaymentStatus}
           readOnly={!canEditMoney}
           onSave={savePaymentStatus}
+          onEditEntry={(entryId, input) =>
+            editStatusEntry(selectedContract, entryId, input)
+          }
+          onRemoveEntry={(entry) =>
+            removeStatusEntry(
+              selectedContract,
+              entry,
+              CONTRACT_PAYMENT[paymentTone(entry.status) ?? 'awaiting'].label,
+            )
+          }
           onClose={() => setStatusAnchor(null)}
         />
       )}
