@@ -501,7 +501,7 @@ export default function Campaigns() {
    * Суммы договора. Разовое поступление уходит отдельным платежом, ручная
    * правка «Оплачено» — правкой сумм (см. useSaveContractMoney).
    */
-  const saveMoney = ({ budget, spent, amount, paidAt }) => {
+  const saveMoney = ({ budget, spent, amount, paidAt, comment }) => {
     if (!moneyContract) return
     const gained = spent - toNumber(moneyContract.spent)
     const number = moneyContract.number
@@ -509,7 +509,7 @@ export default function Campaigns() {
     saveContractMoney(
       {
         contract: moneyContract,
-        money: { budget, spent, amount, paidAt },
+        money: { budget, spent, amount, paidAt, comment },
       },
       {
         // Сохранили — закрываем поповер; при ошибке он остаётся с суммами.
