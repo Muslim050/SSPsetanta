@@ -290,7 +290,10 @@ export function useSaveContractMoney() {
   })
 }
 
-/** Статус оплаты за месяц договора: «ожидает оплату» / «оплачено». */
+/**
+ * Статус оплаты за месяц договора: «ожидает оплату», «частично оплачено»
+ * или «оплачено».
+ */
 export function useSetPaymentStatus() {
   const client = useQueryClient()
 

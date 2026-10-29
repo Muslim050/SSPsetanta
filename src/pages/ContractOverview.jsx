@@ -30,6 +30,7 @@ import {
   CONTRACT_STATUS,
   PAYMENT_OPTIONS,
   paymentTone,
+  worstPaymentTone,
 } from '@/lib/metrics.js'
 import {
   formatDateNumeric,
@@ -66,23 +67,36 @@ const MONTHS = Array.from({ length: 12 }, (_, i) => i)
 // в кампаниях подпись прежняя.
 const PAYMENT_LABELS = {
   awaiting: 'В процессе',
+  partial: CONTRACT_PAYMENT.partial.label,
   paid: CONTRACT_PAYMENT.paid.label,
 }
-// «В процессе» здесь оранжевый, а не красный.
+// «В процессе» здесь оранжевый, а не красный, — поэтому «Частично
+// оплачено», оранжевое в кампаниях, здесь голубое.
 const PAYMENT_BADGES = {
   awaiting: 'bg-warning/20 text-warning',
+  partial: 'bg-sky-500/15 text-sky-700',
   paid: CONTRACT_PAYMENT.paid.badge,
+}
+const PAYMENT_DOTS = {
+  awaiting: 'bg-warning',
+  partial: 'bg-sky-500',
+  paid: 'bg-success',
 }
 const STATUS_OPTIONS = PAYMENT_OPTIONS.map((option) => ({
   ...option,
   label: PAYMENT_LABELS[option.value],
   badge: PAYMENT_BADGES[option.value],
-  dot: option.value === 'paid' ? 'bg-success' : 'bg-warning',
+  dot: PAYMENT_DOTS[option.value],
 }))
 // Подсказки и цвет вкладок месяцев.
-const MONTH_STATUS_TITLES = { paid: 'оплачен', awaiting: 'в процессе' }
+const MONTH_STATUS_TITLES = {
+  paid: 'оплачен',
+  partial: 'оплачен частично',
+  awaiting: 'в процессе',
+}
 const MONTH_STATUS_FILLS = {
   awaiting: 'bg-warning/25 font-semibold text-warning hover:bg-warning/35',
+  partial: 'bg-sky-500/20 font-semibold text-sky-700 hover:bg-sky-500/30',
 }
 
 /** Границы месяца в ISO — с ними и сравниваем срок договора. */
@@ -212,7 +226,8 @@ export default function ContractOverview() {
       rows.filter(({ contract }) => inMonth(contract, activeYear, m)).length,
   )
 
-  // Цвет месяца: красный, если хоть один договор за него не оплачен.
+  // Цвет месяца: «в процессе», если хоть один договор за него не оплачен,
+  // иначе «частично», если хоть один оплачен не до конца.
   const monthStatuses = MONTHS.reduce((acc, m) => {
     const period = periodKey(activeYear, m)
     const statuses = rows
@@ -221,9 +236,8 @@ export default function ContractOverview() {
         paymentTone(contract.paymentStatusByPeriod?.[period]?.status),
       )
       .filter(Boolean)
-    if (statuses.length) {
-      acc[m] = statuses.includes('awaiting') ? 'awaiting' : 'paid'
-    }
+    const tone = worstPaymentTone(statuses)
+    if (tone) acc[m] = tone
     return acc
   }, {})
 

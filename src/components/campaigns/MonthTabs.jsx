@@ -54,9 +54,11 @@ const MONTH_FILLS = [
 // Месяцы, которые ещё не наступили, — серые и без кампаний.
 const FUTURE_FILL = 'bg-ink/3 text-ink-muted/70 cursor-default'
 
-// Месяц со статусом оплаты перекрашивается: зелёный — оплачен, красный — ждём.
+// Месяц со статусом оплаты перекрашивается: зелёный — оплачен, оранжевый —
+// оплачен частично, красный — ждём.
 const STATUS_FILLS = {
   paid: 'bg-success/25 font-semibold text-success hover:bg-success/35',
+  partial: 'bg-warning/25 font-semibold text-warning hover:bg-warning/35',
   awaiting: 'bg-danger/25 font-semibold text-danger hover:bg-danger/35',
 }
 
@@ -156,7 +158,8 @@ export function NowMark() {
  * Отдельной вкладки «Все» нет: фильтр снимает крестик справа (или повторный
  * клик по выбранному месяцу).
  * years: доступные годы, counts: сколько кампаний попадает в каждый месяц,
- * statuses: { [месяц]: 'paid' | 'awaiting' } — статус оплаты договора за месяц.
+ * statuses: { [месяц]: 'paid' | 'partial' | 'awaiting' } — статус оплаты
+ * договора за месяц.
  * statusTitles: подписи этих статусов в подсказке вкладки.
  * statusFills: свой цвет вкладки для статуса — поверх STATUS_FILLS.
  * resetLabel: что делает крестик — страницы трактуют сброс по-разному.
@@ -175,7 +178,11 @@ export function MonthTabs({
   onChange,
   counts,
   statuses,
-  statusTitles = { paid: 'оплачен', awaiting: 'ожидает оплату' },
+  statusTitles = {
+    paid: 'оплачен',
+    partial: 'оплачен частично',
+    awaiting: 'ожидает оплату',
+  },
   statusFills,
   resetLabel = 'Показать все месяцы',
   since = null,

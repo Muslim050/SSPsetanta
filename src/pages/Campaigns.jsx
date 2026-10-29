@@ -555,8 +555,8 @@ export default function Campaigns() {
   /**
    * Вкладки договоров красим статусом оплаты: статус берём тот же, что
    * покажет карточка после выбора, — месяца, если он открыт, иначе
-   * договора. Оплаченный — зелёный, ждёт денег — красный, без статуса —
-   * обычный жёлтый выбор.
+   * договора. Оплаченный — зелёный, оплаченный частично — оранжевый, ждёт
+   * денег — красный, без статуса — обычный жёлтый выбор.
    */
   const contractTabs = contracts.map((item) => {
     const tone = paymentTone(
@@ -566,12 +566,7 @@ export default function Campaigns() {
     return {
       ...item,
       status: tone ?? undefined,
-      statusHint:
-        tone === 'paid'
-          ? 'оплачен'
-          : tone === 'awaiting'
-            ? 'ожидает оплату'
-            : undefined,
+      statusHint: tone ? CONTRACT_PAYMENT[tone].label.toLowerCase() : undefined,
     }
   })
 
