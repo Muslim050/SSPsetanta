@@ -55,6 +55,7 @@ import { MonthTabs, MONTHS_FULL } from '@/components/campaigns/MonthTabs.jsx'
 import { MediaReport } from '@/components/campaigns/MediaReport.jsx'
 import { MoneyPopover } from '@/components/campaigns/MoneyPopover.jsx'
 import { usePaymentActions } from '@/components/campaigns/usePaymentActions.js'
+import { useStatusActions } from '@/components/campaigns/useStatusActions.js'
 import { ContractModal } from '@/components/campaigns/ContractModal.jsx'
 import {
   StatusPopover,
@@ -250,6 +251,7 @@ export default function Campaigns() {
   const { mutate: savePaymentStatusFor, isPending: savingPaymentStatus } =
     useSetPaymentStatus()
   const { editPayment, removePayment } = usePaymentActions()
+  const { editStatusEntry, removeStatusEntry } = useStatusActions()
   const toast = useToast()
 
   const [q, setQ] = useState('')
@@ -1225,6 +1227,16 @@ export default function Campaigns() {
           saving={savingPaymentStatus}
           readOnly={!canEditMoney}
           onSave={savePaymentStatus}
+          onEditEntry={(entryId, input) =>
+            editStatusEntry(selectedContract, entryId, input)
+          }
+          onRemoveEntry={(entry) =>
+            removeStatusEntry(
+              selectedContract,
+              entry,
+              CONTRACT_PAYMENT[paymentTone(entry.status) ?? 'awaiting'].label,
+            )
+          }
           onClose={() => setStatusAnchor(null)}
         />
       )}

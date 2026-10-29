@@ -53,6 +53,7 @@ import {
   PaymentRow,
 } from '@/components/campaigns/MoneyPopover.jsx'
 import { usePaymentActions } from '@/components/campaigns/usePaymentActions.js'
+import { useStatusActions } from '@/components/campaigns/useStatusActions.js'
 import { MonthTabs, MONTHS_FULL } from '@/components/campaigns/MonthTabs.jsx'
 import {
   StatusPopover,
@@ -167,6 +168,7 @@ export default function ContractOverview() {
   const { mutate: savePaymentStatusFor, isPending: savingPaymentStatus } =
     useSetPaymentStatus()
   const { editPayment, removePayment } = usePaymentActions()
+  const { editStatusEntry, removeStatusEntry } = useStatusActions()
   const toast = useToast()
   const [q, setQ] = useState('')
   const [year, setYear] = useState(() => new Date().getFullYear())
@@ -718,6 +720,16 @@ export default function ContractOverview() {
           saving={savingPaymentStatus}
           readOnly={!canEditMoney}
           onSave={savePaymentStatus}
+          onEditEntry={(entryId, input) =>
+            editStatusEntry(paymentRow.contract, entryId, input)
+          }
+          onRemoveEntry={(entry) =>
+            removeStatusEntry(
+              paymentRow.contract,
+              entry,
+              PAYMENT_LABELS[paymentTone(entry.status) ?? 'awaiting'],
+            )
+          }
           onClose={() => setPaymentAnchor(null)}
         />
       )}

@@ -62,6 +62,33 @@ export function statusLog(
   )
 }
 
+/**
+ * Запись истории статусов оплаты: правка статуса, месяца и/или даты смены
+ * (нужно хотя бы одно поле) и удаление. Статус затронутых месяцев сервер
+ * пересчитывает по журналу — берёт самую позднюю по `changedAt` запись
+ * месяца; не осталось записей — месяц пропадает из `paymentStatusByPeriod`.
+ * Оба отдают весь договор.
+ */
+export const statusEntries = {
+  /** PATCH /contracts/:id/status-log/:entryId */
+  update(
+    contractId: number,
+    entryId: number,
+    input: Partial<PaymentStatusInput>,
+  ): Promise<Contract> {
+    return request<Contract>(`/contracts/${contractId}/status-log/${entryId}`, {
+      method: 'PATCH',
+      body: input,
+    })
+  },
+  /** DELETE /contracts/:id/status-log/:entryId */
+  remove(contractId: number, entryId: number): Promise<Contract> {
+    return request<Contract>(`/contracts/${contractId}/status-log/${entryId}`, {
+      method: 'DELETE',
+    })
+  },
+}
+
 /** PATCH /contracts/:id — условия договора: срок, пакет, лиги, статус. */
 export function update(id: number, input: ContractInput): Promise<Contract> {
   return request<Contract>(`/contracts/${id}`, {

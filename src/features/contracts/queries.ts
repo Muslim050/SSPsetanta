@@ -311,6 +311,44 @@ export function useSetPaymentStatus() {
   })
 }
 
+/** Правка записи истории статусов оплаты: статус, месяц и/или дата смены. */
+export function useUpdateStatusEntry() {
+  const client = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      contractId,
+      entryId,
+      input,
+    }: {
+      contractId: number
+      entryId: number
+      input: Partial<contractsApi.PaymentStatusInput>
+    }) => contractsApi.statusEntries.update(contractId, entryId, input),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: advertiserKeys.all })
+    },
+  })
+}
+
+/** Удаление записи истории статусов: статус месяца сервер откатывает сам. */
+export function useDeleteStatusEntry() {
+  const client = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      contractId,
+      entryId,
+    }: {
+      contractId: number
+      entryId: number
+    }) => contractsApi.statusEntries.remove(contractId, entryId),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: advertiserKeys.all })
+    },
+  })
+}
+
 /** Правка поступления: дата, сумма и комментарий. */
 export function useUpdatePayment() {
   const client = useQueryClient()
